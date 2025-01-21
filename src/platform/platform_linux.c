@@ -19,6 +19,11 @@
 #include <string.h>
 #include <stdlib.h>
 
+#define VK_USE_PLATFORM_XCB_KHR
+#include <vulkan/vulkan.h>
+#include "renderer/vulkan/vulkan_types.inl"
+
+
 typedef struct internal_state {
     Display* display;
     xcb_connection_t* connection;
@@ -26,6 +31,7 @@ typedef struct internal_state {
     xcb_window_t window;
     xcb_atom_t wm_delete_window;
     xcb_atom_t wm_protocols;
+    VkSurfaceKHR surface;
 } internal_state;
 
 keys translate_keycode(u32 x_keycode);
@@ -292,6 +298,22 @@ void platform_sleep_ms(u64 ms) {
 
 void platform_get_required_extension_names(const char*** extensions) {
     darray_push(*extensions, &"VK_KHR_xcb_surface");
+}
+
+b8 platform_create_vulkan_surface(platform_state* platform_state, vulkan_context* context) {
+    internal_state *state = (internal_state *)platform_state->internal_state;
+
+    VkXcbSurfaceCreateInfoKHR create_info = {VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR};
+    create_info.connection = state->connection;
+    create_info.window = state->window;
+
+    if (!vkCreateXcbSurfaceKHR(context->instance, &create_info, context->allocator, &state->surface)) {
+        LOG_ERROR("Failed to create the vulkan surface");
+        return FALSE;
+    }
+
+    context->surface = state->surface;
+    return TRUE;
 }
 
 keys translate_keycode(u32 x_keycode) {

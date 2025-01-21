@@ -13,6 +13,7 @@ typedef enum memory_tag {
     MEMORY_TAG_APPLICATION,
     MEMORY_TAG_JOB,
     MEMORY_TAG_RENDERER,
+    MEMORY_TAG_VULKAN,
 
     MEMORY_TAG_MAX_TAGS,
 } memory_tag;

@@ -21,6 +21,8 @@ add_library(cEngine
         src/entry.h
         src/core/cmemory.h
         src/core/cmemory.c
+        src/core/cstring.h
+        src/core/cstring.c
         src/core/event.h
         src/core/event.c
         src/containers/darray.h
@@ -36,7 +38,9 @@ add_library(cEngine
         src/renderer/vulkan/vulkan_types.inl
         src/renderer/vulkan/vulkan_backend.h
         src/renderer/vulkan/vulkan_backend.c
-        src/renderer/vulkan/vulkan_platform.h)
+        src/renderer/vulkan/vulkan_platform.h
+        src/renderer/vulkan/vulkan_device.h
+        src/renderer/vulkan/vulkan_device.c)
 
 target_include_directories(
         cEngine
