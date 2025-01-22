@@ -100,3 +100,5 @@ typedef char b8;
 #define KAPI
 #endif
 #endif
+
+#define cCLAMP(value, min, max) ((value) < (min) ? (min) : (value) > (max) ? (max) : (value))

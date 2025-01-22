@@ -307,8 +307,13 @@ b8 platform_create_vulkan_surface(platform_state* platform_state, vulkan_context
     create_info.connection = state->connection;
     create_info.window = state->window;
 
-    if (!vkCreateXcbSurfaceKHR(context->instance, &create_info, context->allocator, &state->surface)) {
-        LOG_ERROR("Failed to create the vulkan surface");
+    VkResult result = vkCreateXcbSurfaceKHR(
+     context->instance,
+     &create_info,
+     context->allocator,
+     &state->surface);
+    if (result != VK_SUCCESS) {
+        LOG_ERROR("Vulkan surface creation failed.");
         return FALSE;
     }
 

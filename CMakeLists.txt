@@ -40,7 +40,9 @@ add_library(cEngine
         src/renderer/vulkan/vulkan_backend.c
         src/renderer/vulkan/vulkan_platform.h
         src/renderer/vulkan/vulkan_device.h
-        src/renderer/vulkan/vulkan_device.c)
+        src/renderer/vulkan/vulkan_device.c
+        src/renderer/vulkan/vulkan_swapchain.h
+        src/renderer/vulkan/vulkan_swapchain.c)
 
 target_include_directories(
         cEngine

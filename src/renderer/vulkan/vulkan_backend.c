@@ -127,16 +127,20 @@ b8 vulkan_renderer_backend_initialize(struct renderer_backend *backend, const ch
 
 void vulkan_renderer_backend_shutdown(struct renderer_backend *backend) {
     if (context.debug_messenger) {
-        PFN_vkDestroyDebugUtilsMessengerEXT func =
-            (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(context.instance, "vkDestroyDebugUtilsMessengerEXT");
+        PFN_vkDestroyDebugUtilsMessengerEXT func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(context.instance, "vkDestroyDebugUtilsMessengerEXT");
         if (func) {
             func(context.instance, context.debug_messenger, context.allocator);
         }
     }
 
     vulkan_device_destroy(&context);
-    vkDestroyInstance(context.instance, context.allocator);
 
+    if (context.surface) {
+        vkDestroySurfaceKHR(context.instance, context.surface, context.allocator);
+        context.surface = 0;
+    }
+
+    vkDestroyInstance(context.instance, context.allocator);
 }
 
 void vulkan_renderer_backend_resized(struct renderer_backend *backend, u16 width, u16 height) {
