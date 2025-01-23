@@ -33,10 +33,43 @@ typedef struct vulkan_device {
     VkQueue compute_queue;
     VkQueue transfer_queue;
 
+    VkCommandPool graphics_command_pool;
+
     VkPhysicalDeviceProperties properties;
     VkPhysicalDeviceFeatures features;
     VkPhysicalDeviceMemoryProperties memory;
+
+    VkFormat depth_format;
 } vulkan_device;
+
+typedef struct vulkan_image {
+    VkImage handle;
+    VkDeviceMemory memory; // memory allocated in the gpu for the image
+    VkImageView view;
+    u32 width;
+    u32 height;
+} vulkan_image;
+
+
+typedef enum vulkan_render_pass_state {
+    READY,
+    RECORDING,
+    IN_RENDER_PASS,
+    RECORDING_ENDED,
+    SUBMITTED,
+    NOT_ALLOCATED,
+} vulkan_render_pass_state;
+
+typedef struct vulkan_renderpass {
+    VkRenderPass handle;
+    f32 x, y, w, h;
+    f32 r, g, b, a;
+
+    f32 depth;
+    u32 stencil;
+
+    vulkan_render_pass_state state;
+} vulkan_renderpass;
 
 typedef struct vulkan_swapchain {
     VkSurfaceFormatKHR format;
@@ -47,7 +80,24 @@ typedef struct vulkan_swapchain {
     u32 image_count;
     VkImage* images;
     VkImageView* image_views;
+
+    vulkan_image depth_attachment;
 } vulkan_swapchain;
+
+typedef enum vulkan_command_buffer_state {
+    COMMAND_BUFFER_STATE_READY,
+    COMMAND_BUFFER_STATE_RECORDING,
+    COMMAND_BUFFER_STATE_IN_RENDER_PASS,
+    COMMAND_BUFFER_STATE_RECORDING_ENDED,
+    COMMAND_BUFFER_STATE_SUBMITTED,
+    COMMAND_BUFFER_STATE_NOT_ALLOCATED,
+} vulkan_command_buffer_state;
+
+typedef struct vulkan_command_buffer {
+    VkCommandBuffer handle;
+
+    vulkan_command_buffer_state state;
+} vulkan_command_buffer;
 
 typedef struct vulkan_context {
     VkInstance instance;
@@ -60,5 +110,19 @@ typedef struct vulkan_context {
 #if _DEBUG
     VkDebugUtilsMessengerEXT debug_messenger;
 #endif
+
     vulkan_device device;
+
+    vulkan_swapchain swapchain;
+    vulkan_renderpass main_renderpass;
+
+    // darray
+    vulkan_command_buffer* graphics_command_buffers;
+
+    u32 image_index;
+    u32 current_frame;
+
+    b8 need_to_recreate_swapchain;
+
+    i32 (*find_memory_index)(u32 type_filter, u32 property_flags);
 } vulkan_context;

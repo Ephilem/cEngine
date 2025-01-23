@@ -115,6 +115,11 @@ b8 vulkan_device_create(vulkan_context *context) {
         0,
         &context->device.transfer_queue);
 
+    VkCommandPoolCreateInfo command_pool_create_info = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+    command_pool_create_info.queueFamilyIndex = context->device.graphics_queue_index;
+    command_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    VK_CHECK(vkCreateCommandPool(context->device.logical, &command_pool_create_info, context->allocator, &context->device.graphics_command_pool));
+
     return TRUE;
 }
 
@@ -124,6 +129,8 @@ void vulkan_device_destroy(vulkan_context *context) {
     context->device.present_queue = 0;
     context->device.compute_queue = 0;
     context->device.transfer_queue = 0;
+
+    vkDestroyCommandPool(context->device.logical, context->device.graphics_command_pool, context->allocator);
 
     if (context->device.logical) {
         vkDestroyDevice(context->device.logical, context->allocator);
@@ -413,4 +420,28 @@ b8 physical_device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surf
     }
 
     return TRUE;
+}
+
+b8 vulkan_device_detect_depth_format(vulkan_device *device) {
+    const u64 candidate_count = 3;
+    VkFormat candidates[] = {
+        VK_FORMAT_D32_SFLOAT,
+        VK_FORMAT_D32_SFLOAT_S8_UINT,
+        VK_FORMAT_D24_UNORM_S8_UINT
+    };
+
+    u32 flags = VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    for (u32 i = 0; i < candidate_count; ++i) {
+        VkFormatProperties props;
+        vkGetPhysicalDeviceFormatProperties(device->physical, candidates[i], &props);
+
+        if ((props.linearTilingFeatures & flags) == flags) {
+            device->depth_format = candidates[i];
+            return TRUE;
+        } else if ((props.optimalTilingFeatures & flags) == flags) {
+            device->depth_format = candidates[i];
+            return TRUE;
+        }
+    }
+    return FALSE;
 }

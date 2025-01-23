@@ -2,10 +2,14 @@
 
 #include "vulkan_device.h"
 #include "vulkan_platform.h"
+#include "vulkan_swapchain.h"
+#include "vulkan_renderpass.h"
+#include "vulkan_command_buffer.h"
 #include "vulkan_types.inl"
 
 #include "core/logger.h"
 #include "core/cstring.h"
+#include "core/cmemory.h"
 
 #include "containers/darray.h"
 
@@ -20,11 +24,15 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     const VkDebugUtilsMessengerCallbackDataEXT* callback_data,
     void* user_data);
 
+i32 find_memory_index(u32 type_filter, u32 property_flags);
+
+void create_command_buffers(renderer_backend* backend);
 
 b8 vulkan_renderer_backend_initialize(struct renderer_backend *backend, const char *application_name, struct platform_state *platform_state) {
-
     // TODO use platform allocator with the tag MEMORY_TAG_VULKAN
     context.allocator = 0;
+
+    context.find_memory_index = find_memory_index;
 
     VkApplicationInfo app_info = {VK_STRUCTURE_TYPE_APPLICATION_INFO};
     app_info.apiVersion = VK_API_VERSION_1_3;
@@ -122,16 +130,31 @@ b8 vulkan_renderer_backend_initialize(struct renderer_backend *backend, const ch
         LOG_ERROR("Failed to create the device");
         return FALSE;
     }
+
+    vulkan_swapchain_create(&context, context.framebuffer_width, context.framebuffer_width, &context.swapchain);
+
+    vulkan_renderpass_create(&context, &context.main_renderpass, 0, 0, context.framebuffer_width, context.framebuffer_height, 0.0f, 0.0f, 0.2f, 1.0f, 1.0f, 0);
+
+    create_command_buffers(backend);
+
     return TRUE;
 }
 
 void vulkan_renderer_backend_shutdown(struct renderer_backend *backend) {
-    if (context.debug_messenger) {
-        PFN_vkDestroyDebugUtilsMessengerEXT func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(context.instance, "vkDestroyDebugUtilsMessengerEXT");
-        if (func) {
-            func(context.instance, context.debug_messenger, context.allocator);
+
+    // destroy the command buffers
+    for (u32 i = 0; i < context.swapchain.image_count; ++i) {
+        if (context.graphics_command_buffers[i].handle) {
+            vulkan_command_buffer_free_from_pool(&context, context.device.graphics_command_pool, &context.graphics_command_buffers[i]);
+            context.graphics_command_buffers[i].handle = 0;
         }
     }
+    darray_destroy(context.graphics_command_buffers);
+    context.graphics_command_buffers = 0;
+
+    vulkan_renderpass_destroy(&context, &context.main_renderpass);
+
+    vulkan_swapchain_destroy(&context, &context.swapchain);
 
     vulkan_device_destroy(&context);
 
@@ -139,6 +162,14 @@ void vulkan_renderer_backend_shutdown(struct renderer_backend *backend) {
         vkDestroySurfaceKHR(context.instance, context.surface, context.allocator);
         context.surface = 0;
     }
+
+    if (context.debug_messenger) {
+        PFN_vkDestroyDebugUtilsMessengerEXT func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(context.instance, "vkDestroyDebugUtilsMessengerEXT");
+        if (func) {
+            func(context.instance, context.debug_messenger, context.allocator);
+        }
+    }
+
 
     vkDestroyInstance(context.instance, context.allocator);
 }
@@ -176,6 +207,37 @@ VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
         break;
     }
     return VK_FALSE;
+}
+
+i32 find_memory_index(u32 type_filter, u32 property_flags) {
+    VkPhysicalDeviceMemoryProperties memory_properties;
+    vkGetPhysicalDeviceMemoryProperties(context.device.physical, &memory_properties);
+
+    for (u32 i = 0; i < memory_properties.memoryTypeCount; ++i) {
+        if (type_filter & (1 << i) && (memory_properties.memoryTypes[i].propertyFlags & property_flags) == property_flags) {
+            return i;
+        }
+    }
+
+    LOG_WARN("Failed to find a suitable memory type");
+    return -1;
+}
+
+void create_command_buffers(renderer_backend *backend) {
+    if (!context.graphics_command_buffers) {
+        context.graphics_command_buffers = darray_reserve(vulkan_command_buffer, context.swapchain.image_count);
+        for (u32 i = 0; i < context.swapchain.image_count; ++i) {
+            czero_memory(&context.graphics_command_buffers[i], sizeof(vulkan_command_buffer));
+        }
+    }
+
+    for (u32 i = 0; i < context.swapchain.image_count; ++i) {
+        if (context.graphics_command_buffers[i].handle) {
+            vulkan_command_buffer_free_from_pool(&context, context.device.graphics_command_pool, &context.graphics_command_buffers[i]);
+        }
+        czero_memory(&context.graphics_command_buffers[i], sizeof(vulkan_command_buffer));
+        vulkan_command_buffer_allocate_from_pool(&context, context.device.graphics_command_pool, TRUE, &context.graphics_command_buffers[i]);
+    }
 }
 
 

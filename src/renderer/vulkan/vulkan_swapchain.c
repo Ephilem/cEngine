@@ -1,6 +1,8 @@
 #include "vulkan_swapchain.h"
 
 #include "vulkan_device.h"
+#include "vulkan_image.h"
+#include "core/cmemory.h"
 #include "core/logger.h"
 
 void create(vulkan_context* context, u32 width, u32 height, vulkan_swapchain* swapchain);
@@ -61,8 +63,8 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
 
     // choose the format of the surface
     b8 found = FALSE;
-    for (u32 i = 0; i < context->device.swapchain_support.format_count; ++i) {
-        VkSurfaceFormatKHR format = context->device.swapchain_support.formats[i];
+    for (u32 i = 0; i < context->device.swapchain_support_info.format_count; ++i) {
+        VkSurfaceFormatKHR format = context->device.swapchain_support_info.formats[i];
         if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&  format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             swapchain->format = format;
             found = TRUE;
@@ -75,7 +77,7 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
     }
 
     VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
-    for (u32 i = 0; i < context->device.swapchain_support_info.present_modes[i]) {
+    for (u32 i = 0; i < context->device.swapchain_support_info.present_modes[i]; ++i) {
         VkPresentModeKHR mode = context->device.swapchain_support_info.present_modes[i];
         if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
             present_mode = mode;
@@ -131,8 +133,63 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
     create_info.presentMode = present_mode;
     create_info.clipped = VK_TRUE;
     create_info.oldSwapchain = 0;
-    // todo you are here
+
+    VK_CHECK(vkCreateSwapchainKHR(context->device.logical, &create_info, context->allocator, &swapchain->swapchain));
+
+    context->current_frame = 0;
+
+    swapchain->image_count = 0;
+    VK_CHECK(vkGetSwapchainImagesKHR(context->device.logical, swapchain->swapchain, &swapchain->image_count, 0));
+    if (!swapchain->images) {
+        swapchain->images = (VkImage*)callocate(sizeof(VkImage) * swapchain->image_count, MEMORY_TAG_RENDERER);
+    }
+    if (!swapchain->image_views) {
+        swapchain->image_views = (VkImageView*)callocate(sizeof(VkImageView) * swapchain->image_count, MEMORY_TAG_RENDERER);
+    }
+    VK_CHECK(vkGetSwapchainImagesKHR(context->device.logical, swapchain->swapchain, &swapchain->image_count, swapchain->images));
+
+    // generate views
+    for (u32 i = 0; i < swapchain->image_count; ++i) {
+        VkImageViewCreateInfo view_info = {VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+        view_info.image = swapchain->images[i];
+        view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        view_info.format = swapchain->format.format;
+        view_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        view_info.subresourceRange.baseMipLevel = 0;
+        view_info.subresourceRange.levelCount = 1;
+        view_info.subresourceRange.baseArrayLayer = 0;
+        view_info.subresourceRange.layerCount = 1;
+
+        VK_CHECK(vkCreateImageView(context->device.logical, &view_info, context->allocator, &swapchain->image_views[i]));
+    }
+
+    if (!vulkan_device_detect_depth_format(&context->device)) {
+        context->device.depth_format = VK_FORMAT_UNDEFINED;
+        LOG_FATAL("No depth format!!!!");
+    }
+
+    vulkan_image_create(
+        context,
+        VK_IMAGE_TYPE_2D,
+        swapchain_extent.width,
+        swapchain_extent.height,
+        context->device.depth_format,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        TRUE,
+        VK_IMAGE_ASPECT_DEPTH_BIT,
+        &swapchain->depth_attachment);
+
+    LOG_TRACE("Swapchain created successfully");
 }
 
 void destroy(vulkan_context *context, vulkan_swapchain *swapchain) {
+    vulkan_image_destroy(context, &swapchain->depth_attachment);
+
+    for (u32 i = 0; i < swapchain->image_count; ++i) {
+        vkDestroyImageView(context->device.logical, swapchain->image_views[i], context->allocator);
+    }
+
+    vkDestroySwapchainKHR(context->device.logical, swapchain->swapchain, context->allocator);
 }
