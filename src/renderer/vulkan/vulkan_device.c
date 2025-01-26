@@ -1,11 +1,10 @@
 #include "vulkan_device.h"
 
-#include <ctype.h>
-
-#include "containers/darray.h"
 #include "core/cmemory.h"
 #include "core/cstring.h"
 #include "core/logger.h"
+
+#include "containers/darray.h"
 
 typedef struct vulkan_physical_device_requirements {
     b8 graphics;
@@ -37,6 +36,9 @@ b8 physical_device_meets_requirements(
 
 
 b8 vulkan_device_create(vulkan_context *context) {
+    LOG_DEBUG("Creating Vulkan device");
+
+    // Choosing a physical device by their properties
     if (!select_physical_device(context)) {
         LOG_ERROR("Failed to select a physical device");
         return FALSE;
@@ -89,6 +91,7 @@ b8 vulkan_device_create(vulkan_context *context) {
     const char* extension_names = VK_KHR_SWAPCHAIN_EXTENSION_NAME;
     create_info.ppEnabledExtensionNames = &extension_names;
 
+    LOG_DEBUG("Creating the logical device with %d queue families", index_count);
     VK_CHECK(vkCreateDevice(context->device.physical, &create_info, context->allocator, &context->device.logical));
 
     vkGetDeviceQueue(
@@ -115,6 +118,7 @@ b8 vulkan_device_create(vulkan_context *context) {
         0,
         &context->device.transfer_queue);
 
+    LOG_DEBUG("Creating a command pool for the graphics queue");
     VkCommandPoolCreateInfo command_pool_create_info = {VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
     command_pool_create_info.queueFamilyIndex = context->device.graphics_queue_index;
     command_pool_create_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
@@ -193,9 +197,9 @@ b8 select_physical_device(vulkan_context *context) {
         LOG_ERROR("Failed to find any physical devices that support Vulkan");
         return FALSE;
     }
-
     VkPhysicalDevice physical_devices[physical_device_count];
     VK_CHECK(vkEnumeratePhysicalDevices(context->instance, &physical_device_count, physical_devices));
+
 
     for (u32 i = 0; i < physical_device_count; i++) {
         VkPhysicalDeviceProperties properties;
@@ -230,46 +234,49 @@ b8 select_physical_device(vulkan_context *context) {
 
         // if we can use this device
         if (result) {
-            LOG_INFO("Selected device: %s", properties.deviceName);
+            LOG_TRACE("Selected device: %s", properties.deviceName);
             switch (properties.deviceType) {
                 default:
                 case VK_PHYSICAL_DEVICE_TYPE_OTHER:
-                    LOG_INFO("Device Type: Other");
+                    LOG_TRACE("Device Type: Other");
                     break;
                 case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
-                    LOG_INFO("Device Type: Integrated GPU");
+                    LOG_TRACE("Device Type: Integrated GPU");
                     break;
                 case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
-                    LOG_INFO("Device Type: Discrete GPU");
+                    LOG_TRACE("Device Type: Discrete GPU");
                     break;
                 case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
-                    LOG_INFO("Device Type: Virtual GPU");
+                    LOG_TRACE("Device Type: Virtual GPU");
                     break;
                 case VK_PHYSICAL_DEVICE_TYPE_CPU:
-                    LOG_INFO("Device Type: CPU");
+                    LOG_TRACE("Device Type: CPU");
                     break;
             }
 
-            LOG_INFO(
+            LOG_TRACE(
                 "GPU Driver version: %d.%d.%d",
                 VK_VERSION_MAJOR(properties.driverVersion),
                 VK_VERSION_MINOR(properties.driverVersion),
                 VK_VERSION_PATCH(properties.driverVersion));
 
-            LOG_INFO(
+            LOG_TRACE(
                 "Vulkan API version: %d.%d.%d",
                 VK_VERSION_MAJOR(properties.apiVersion),
                 VK_VERSION_MINOR(properties.apiVersion),
                 VK_VERSION_PATCH(properties.apiVersion));
 
+
+            LOG_TRACE("=== Memory Types ===");
+            LOG_TRACE("Type          | Size (GiB) | Location");
+            LOG_TRACE("--------------|------------|----------");
             for (u32 j = 0; j < memory.memoryTypeCount; ++j) {
                 f32 memory_size_gib = ((f32) memory.memoryHeaps[memory.memoryTypes[j].heapIndex].size) / (1024 * 1024 * 1024);
-                if (memory.memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
-                    LOG_INFO("Device Local Memory: %.2f GiB", memory_size_gib);
-                } else {
-                    LOG_INFO("Shared System Memory: %.2f GiB", memory_size_gib);
-                }
+                const char* location = (memory.memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) ? "GPU" : "System";
+                const char* type = (memory.memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) ? "Device Local " : "Shared System";
+                LOG_TRACE("%-4s | %10.2f | %s", type, memory_size_gib, location);
             }
+            LOG_TRACE("=====================");
 
             context->device.physical = physical_devices[i];
             context->device.graphics_queue_index = queue_info.graphics_family_index;
@@ -306,7 +313,7 @@ b8 physical_device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surf
 
     if (requirements->discrete_gpu) {
         if (properties->deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
-            LOG_INFO("Device is not a discrete GPU, and one is reequired");
+            LOG_ERROR("Device is not a discrete GPU, and one is required");
             return FALSE;
         }
     }
@@ -316,8 +323,9 @@ b8 physical_device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surf
     VkQueueFamilyProperties* queue_families = darray_reserve(VkQueueFamilyProperties, queue_family_count);
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, queue_families);
 
-    LOG_INFO("Graphics | Compute | Transfer | Present | Name");
+    LOG_TRACE("Number of queue families: %d", queue_family_count);
     u8 min_transfer_score = 255;
+    // Looking at each queue and see what queues it supports
     for (u32 i = 0; i < queue_family_count; ++i) {
         u8 score = 0;
 
@@ -351,7 +359,8 @@ b8 physical_device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surf
         }
     }
 
-    LOG_INFO("  %d  |   %d   |    %d    |    %d    | %s",
+    LOG_TRACE("Graphics | Compute | Transfer | Present | Name");
+    LOG_TRACE("    %d    |    %d    |    %d     |    %d    | %s",
         out_queue_info->graphics_family_index != -1,
         out_queue_info->compute_family_index != -1,
         out_queue_info->transfer_family_index != -1,
@@ -365,7 +374,7 @@ b8 physical_device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surf
         (!requirements->transfer || (requirements->transfer && out_queue_info->transfer_family_index != -1)) &&
         (!requirements->present || (requirements->present && out_queue_info->present_family_index != -1))) {
 
-        LOG_INFO("Device meets all requirements");
+        LOG_TRACE("Device meets all requirements");
         LOG_TRACE("Graphics Family Index: %d", out_queue_info->graphics_family_index);
         LOG_TRACE("Compute Family Index: %d", out_queue_info->compute_family_index);
         LOG_TRACE("Transfer Family Index: %d", out_queue_info->transfer_family_index);
@@ -380,7 +389,7 @@ b8 physical_device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surf
             if (out_swapchain_support_info->present_modes) {
                 cfree(out_swapchain_support_info->present_modes, out_swapchain_support_info->present_mode_count * sizeof(VkPresentModeKHR), MEMORY_TAG_RENDERER);
             }
-            LOG_INFO("Device does not support swapchain");
+            LOG_ERROR("Device does not support swapchain");
             return FALSE;
         }
     }
@@ -405,8 +414,10 @@ b8 physical_device_meets_requirements(VkPhysicalDevice device, VkSurfaceKHR surf
                 }
 
                 if (!found) {
-                    LOG_INFO("Device does not support the required extension %s", requirements->device_extension_names[i]);
+                    LOG_ERROR("Device does not support the required extension %s", requirements->device_extension_names[i]);
                     return FALSE;
+                } else {
+                    LOG_TRACE("Device supports extension %s", requirements->device_extension_names[i]);
                 }
             }
         }

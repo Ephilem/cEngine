@@ -8,6 +8,7 @@
 static renderer_backend* backend = 0;
 
 b8 renderer_initialize(const char* application_name, struct platform_state* platform_state) {
+    LOG_INFO("Initializing renderer...");
     backend = callocate(sizeof(renderer_backend), MEMORY_TAG_RENDERER);
     backend->frame_number = 0;
 

@@ -57,7 +57,7 @@ b8 event_register(u16 code, void* listener, PFN_on_event on_event) {
 
     // create the array if it doesn't exist
 	if (state.registered[code].events == 0) {
-		state.registered[code].events = darray_create(sizeof(registered_event));
+		state.registered[code].events = darray_create(registered_event);
 	}
 
     // check if the listener is already registered
@@ -73,6 +73,8 @@ b8 event_register(u16 code, void* listener, PFN_on_event on_event) {
     // register
     registered_event event = { listener, on_event };
     darray_push(state.registered[code].events, event);
+
+    LOG_TRACE("Event listener registered for code %d (callback: %p)", code, on_event);
 
     return TRUE;
 }
@@ -108,7 +110,7 @@ b8 event_fire(u16 code, void* sender, event_context context) {
         return FALSE;
     }
 
-    // if nothign is registered of the code, return false
+    // if nothing is registered of the code, return false
     if (state.registered[code].events == 0) {
         return FALSE;
     }

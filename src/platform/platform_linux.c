@@ -301,6 +301,7 @@ void platform_get_required_extension_names(const char*** extensions) {
 }
 
 b8 platform_create_vulkan_surface(platform_state* platform_state, vulkan_context* context) {
+    LOG_DEBUG("Creating surface for Vulkan. Current platform: Linux with XCB (X11)");
     internal_state *state = (internal_state *)platform_state->internal_state;
 
     VkXcbSurfaceCreateInfoKHR create_info = {VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR};
@@ -313,7 +314,7 @@ b8 platform_create_vulkan_surface(platform_state* platform_state, vulkan_context
      context->allocator,
      &state->surface);
     if (result != VK_SUCCESS) {
-        LOG_ERROR("Vulkan surface creation failed.");
+        LOG_ERROR("Vulkan surface creation failed");
         return FALSE;
     }
 

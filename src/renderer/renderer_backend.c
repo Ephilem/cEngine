@@ -1,5 +1,6 @@
 #include "renderer_backend.h"
 
+#include "core/logger.h"
 #include "vulkan/vulkan_backend.h"
 
 b8 renderer_backend_create(renderer_backend_type type, struct platform_state* platform_state, renderer_backend* out_backend) {
@@ -7,6 +8,7 @@ b8 renderer_backend_create(renderer_backend_type type, struct platform_state* pl
 
     switch (type) {
         case RENDERER_BACKEND_VULKAN: {
+            LOG_DEBUG("Renderer backend: Vulkan");
             out_backend->initialize = vulkan_renderer_backend_initialize;
             out_backend->shutdown = vulkan_renderer_backend_shutdown;
             out_backend->begin_frame = vulkan_renderer_backend_begin_frame;

@@ -8,8 +8,8 @@
 void create(vulkan_context* context, u32 width, u32 height, vulkan_swapchain* swapchain);
 void destroy(vulkan_context* context, vulkan_swapchain* swapchain);
 
-void vulkan_swapchain_create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *swapchain) {
-    create(context, width, height, swapchain);
+void vulkan_swapchain_create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *out_swapchain) {
+    create(context, width, height, out_swapchain);
 }
 
 void vulkan_swapchain_recreate(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *swapchain) {
@@ -21,17 +21,28 @@ void vulkan_swapchain_destroy(vulkan_context *context, vulkan_swapchain *swapcha
     destroy(context, swapchain);
 }
 
-b8 vulkan_swapchain_acquire_next_image(vulkan_context *context, vulkan_swapchain *swapchain, u64 timeout_ns,
-    VkSemaphore image_available_semaphore, VkFence fence, u32 *out_image_index) {
+b8 vulkan_swapchain_acquire_next_image_index(
+    vulkan_context* context,
+    vulkan_swapchain* swapchain,
+    u64 timeout_ns,
+    VkSemaphore image_available_semaphore,
+    VkFence fence,
+    u32* out_image_index) {
+    VkResult result = vkAcquireNextImageKHR(
+        context->device.logical,
+        swapchain->handle,
+        timeout_ns,
+        image_available_semaphore,
+        fence,
+        out_image_index);
 
-    // return our image index
-    VkResult result = vkAcquireNextImageKHR(context->device.logical, swapchain->swapchain, timeout_ns, image_available_semaphore, fence, out_image_index);
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-        // mean that the swapchain need a recreation
+        // Trigger swapchain recreation, then boot out of the render loop.
+        LOG_DEBUG("vulkan_swapchain_acquire_next_image_index: Swapchain out of date, recreating...");
         vulkan_swapchain_recreate(context, context->framebuffer_width, context->framebuffer_height, swapchain);
         return FALSE;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-        LOG_ERROR("Failed to acquire a swapchain image");
+        LOG_FATAL("Failed to acquire swapchain image!");
         return FALSE;
     }
 
@@ -45,27 +56,32 @@ void vulkan_swapchain_present(vulkan_context *context, vulkan_swapchain *swapcha
     present_info.waitSemaphoreCount = 1;
     present_info.pWaitSemaphores = &render_complete_semaphore;
     present_info.swapchainCount = 1;
-    present_info.pSwapchains = &swapchain->swapchain;
+    present_info.pSwapchains = &swapchain->handle;
     present_info.pImageIndices = &present_image_index;
     present_info.pResults = 0;
 
     VkResult result = vkQueuePresentKHR(present_queue, &present_info);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
+        LOG_DEBUG("vulkan_swapchain_present: Swapchain out of date or suboptimal, recreating...");
         vulkan_swapchain_recreate(context, context->framebuffer_width, context->framebuffer_height, swapchain);
     } else if (result != VK_SUCCESS) {
         LOG_ERROR("Failed to present the swapchain image");
     }
+
+    // switch to the next frame
+    context->current_frame = (context->current_frame + 1) % swapchain->max_frames_in_flight;
 }
 
 void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *swapchain) {
+    LOG_DEBUG("Starting swapchain creation");
     VkExtent2D swapchain_extent = {width, height}; // size
-    swapchain->max_frame_in_flight = 2;
+    swapchain->max_frames_in_flight = 2;
 
     // choose the format of the surface
     b8 found = FALSE;
     for (u32 i = 0; i < context->device.swapchain_support_info.format_count; ++i) {
         VkSurfaceFormatKHR format = context->device.swapchain_support_info.formats[i];
-        if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&  format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
+        if (format.format == VK_FORMAT_B8G8R8A8_UNORM && format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             swapchain->format = format;
             found = TRUE;
             break;
@@ -73,13 +89,14 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
     }
 
     if (!found) {
+        LOG_TRACE("No preferred format found, using the first one");
         swapchain->format = context->device.swapchain_support_info.formats[0];
     }
 
-    VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR;
+    VkPresentModeKHR present_mode = VK_PRESENT_MODE_FIFO_KHR; // display all frame in proper order
     for (u32 i = 0; i < context->device.swapchain_support_info.present_modes[i]; ++i) {
         VkPresentModeKHR mode = context->device.swapchain_support_info.present_modes[i];
-        if (mode == VK_PRESENT_MODE_MAILBOX_KHR) {
+        if (mode == VK_PRESENT_MODE_MAILBOX_KHR) { // use the most current image available (preferred one)
             present_mode = mode;
             break;
         }
@@ -90,6 +107,7 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
         context->surface,
         &context->device.swapchain_support_info);
 
+    // safegard if the window manager doesn't provide the size
     if (context->device.swapchain_support_info.capabilities.currentExtent.width != UINT32_MAX) {
         swapchain_extent = context->device.swapchain_support_info.capabilities.currentExtent;
     }
@@ -105,48 +123,49 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
         image_count = context->device.swapchain_support_info.capabilities.maxImageCount;
     }
 
-    VkSwapchainCreateInfoKHR create_info = {VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
-    create_info.surface = context->surface;
-    create_info.minImageCount = image_count;
-    create_info.imageFormat = swapchain->format.format;
-    create_info.imageColorSpace = swapchain->format.colorSpace;
-    create_info.imageExtent = swapchain_extent;
-    create_info.imageArrayLayers = 1;
-    create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    VkSwapchainCreateInfoKHR swapchain_create_info = {VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
+    swapchain_create_info.surface = context->surface;
+    swapchain_create_info.minImageCount = image_count;
+    swapchain_create_info.imageFormat = swapchain->format.format;
+    swapchain_create_info.imageColorSpace = swapchain->format.colorSpace;
+    swapchain_create_info.imageExtent = swapchain_extent;
+    swapchain_create_info.imageArrayLayers = 1;
+    swapchain_create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    // make use of different queues if possible
+    // Setup the queue family indices
     if (context->device.graphics_queue_index != context->device.present_queue_index) {
         u32 queueFamilyIndices[] = {
             (u32)context->device.graphics_queue_index,
             (u32)context->device.present_queue_index};
-        create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        create_info.queueFamilyIndexCount = 2;
-        create_info.pQueueFamilyIndices = queueFamilyIndices;
+        swapchain_create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        swapchain_create_info.queueFamilyIndexCount = 2;
+        swapchain_create_info.pQueueFamilyIndices = queueFamilyIndices;
     } else {
-        create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        create_info.queueFamilyIndexCount = 0;
-        create_info.pQueueFamilyIndices = 0;
+        swapchain_create_info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        swapchain_create_info.queueFamilyIndexCount = 0;
+        swapchain_create_info.pQueueFamilyIndices = 0;
     }
 
-    create_info.preTransform = context->device.swapchain_support_info.capabilities.currentTransform;
-    create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    create_info.presentMode = present_mode;
-    create_info.clipped = VK_TRUE;
-    create_info.oldSwapchain = 0;
+    swapchain_create_info.preTransform = context->device.swapchain_support_info.capabilities.currentTransform;
+    swapchain_create_info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    swapchain_create_info.presentMode = present_mode;
+    swapchain_create_info.clipped = VK_TRUE;
+    swapchain_create_info.oldSwapchain = 0;
 
-    VK_CHECK(vkCreateSwapchainKHR(context->device.logical, &create_info, context->allocator, &swapchain->swapchain));
+    VK_CHECK(vkCreateSwapchainKHR(context->device.logical, &swapchain_create_info, context->allocator, &swapchain->handle));
 
+    // start with a zero frame index
     context->current_frame = 0;
 
     swapchain->image_count = 0;
-    VK_CHECK(vkGetSwapchainImagesKHR(context->device.logical, swapchain->swapchain, &swapchain->image_count, 0));
+    VK_CHECK(vkGetSwapchainImagesKHR(context->device.logical, swapchain->handle, &swapchain->image_count, 0));
     if (!swapchain->images) {
         swapchain->images = (VkImage*)callocate(sizeof(VkImage) * swapchain->image_count, MEMORY_TAG_RENDERER);
     }
-    if (!swapchain->image_views) {
-        swapchain->image_views = (VkImageView*)callocate(sizeof(VkImageView) * swapchain->image_count, MEMORY_TAG_RENDERER);
+    if (!swapchain->views) {
+        swapchain->views = (VkImageView*)callocate(sizeof(VkImageView) * swapchain->image_count, MEMORY_TAG_RENDERER);
     }
-    VK_CHECK(vkGetSwapchainImagesKHR(context->device.logical, swapchain->swapchain, &swapchain->image_count, swapchain->images));
+    VK_CHECK(vkGetSwapchainImagesKHR(context->device.logical, swapchain->handle, &swapchain->image_count, swapchain->images));
 
     // generate views
     for (u32 i = 0; i < swapchain->image_count; ++i) {
@@ -159,8 +178,9 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
         view_info.subresourceRange.levelCount = 1;
         view_info.subresourceRange.baseArrayLayer = 0;
         view_info.subresourceRange.layerCount = 1;
+        LOG_TRACE("Creating color image view %d", i);
 
-        VK_CHECK(vkCreateImageView(context->device.logical, &view_info, context->allocator, &swapchain->image_views[i]));
+        VK_CHECK(vkCreateImageView(context->device.logical, &view_info, context->allocator, &swapchain->views[i]));
     }
 
     if (!vulkan_device_detect_depth_format(&context->device)) {
@@ -168,6 +188,7 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
         LOG_FATAL("No depth format!!!!");
     }
 
+    // Create depth image and its view.
     vulkan_image_create(
         context,
         VK_IMAGE_TYPE_2D,
@@ -180,16 +201,19 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
         TRUE,
         VK_IMAGE_ASPECT_DEPTH_BIT,
         &swapchain->depth_attachment);
+    LOG_TRACE("Depth attachment created");
 
-    LOG_TRACE("Swapchain created successfully");
+
+    LOG_DEBUG("Swapchain created successfully");
 }
 
 void destroy(vulkan_context *context, vulkan_swapchain *swapchain) {
+    LOG_DEBUG("Destroying swapchain");
     vulkan_image_destroy(context, &swapchain->depth_attachment);
 
     for (u32 i = 0; i < swapchain->image_count; ++i) {
-        vkDestroyImageView(context->device.logical, swapchain->image_views[i], context->allocator);
+        vkDestroyImageView(context->device.logical, swapchain->views[i], context->allocator);
     }
 
-    vkDestroySwapchainKHR(context->device.logical, swapchain->swapchain, context->allocator);
+    vkDestroySwapchainKHR(context->device.logical, swapchain->handle, context->allocator);
 }
