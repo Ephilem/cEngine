@@ -33,6 +33,7 @@ static application_state app_state;
 
 b8 application_on_event(u16 code, void* sender, void* listener_inst, event_context context);
 b8 application_on_key(u16 code, void* sender, void* listener_inst, event_context context);
+b8 application_on_window_resize(u16 code, void* sender, void* listener_inst, event_context context);
 
 b8 application_create(app* app_inst) {
     if (initialized) {
@@ -56,6 +57,7 @@ b8 application_create(app* app_inst) {
     event_register(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
     event_register(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
     event_register(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
+    event_register(EVENT_CODE_WINDOW_RESIZE, 0, application_on_window_resize);
 
 
     if (!platform_startup(&app_state.platform_state,
@@ -196,4 +198,28 @@ b8 application_on_key(u16 code, void* sender, void* listener_inst, event_context
         }
     }
     return FALSE;
+}
+
+b8 application_on_window_resize(u16 code, void *sender, void *listener_inst, event_context context) {
+    if (code == EVENT_CODE_WINDOW_RESIZE) {
+        u16 width = context.data.u16[0];
+        u16 height = context.data.u16[1];
+
+        if (width != app_state.width || height != app_state.height) {
+            app_state.width = width;
+            app_state.height = height;
+
+            if (width == 0 || height == 0) {
+                LOG_INFO("Window is minimized, suspending application");
+                app_state.state = APPLICATION_STATE_SUSPENDED;
+            } else {
+                if (app_state.state == APPLICATION_STATE_SUSPENDED) {
+                    LOG_INFO("Window is restored, resuming application");
+                    app_state.state = APPLICATION_STATE_RUNNING;
+                }
+                app_state.app_inst->on_resize(app_state.app_inst, width, height);
+                renderer_on_resize(width, height);
+            }
+        }
+    }
 }

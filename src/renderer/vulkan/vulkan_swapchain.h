@@ -44,3 +44,8 @@ void vulkan_swapchain_present(
     VkQueue present_queue,
     VkSemaphore render_complete_semaphore,
     u32 present_image_index);
+
+void vulkan_swapchain_regenerate_framebuffers(
+    vulkan_context* context,
+    vulkan_swapchain* swapchain,
+    vulkan_renderpass* renderpass);

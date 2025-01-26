@@ -83,6 +83,7 @@ typedef struct vulkan_swapchain {
     u8 max_frames_in_flight;
 
     VkSwapchainKHR handle;
+    VkExtent2D extent;
 
     u32 image_count;
     VkImage* images;
@@ -122,6 +123,9 @@ typedef struct vulkan_context {
     u32 framebuffer_width;
     u32 framebuffer_height;
 
+    u64 framebuffer_size_generation;
+    u64 framebuffer_size_last_generation;
+
 #if _DEBUG
     VkDebugUtilsMessengerEXT debug_messenger;
 #endif
@@ -150,6 +154,7 @@ typedef struct vulkan_context {
     u32 image_index;
     u32 current_frame;
 
-
     i32 (*find_memory_index)(u32 type_filter, u32 property_flags); // function to find the memory index for a given type filter and property flags
+
+
 } vulkan_context;

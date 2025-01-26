@@ -30,6 +30,14 @@ void renderer_shutdown() {
     }
 }
 
+void renderer_on_resize(u16 width, u16 height) {
+    if (backend) {
+        backend->resized(backend, width, height);
+    } else {
+        LOG_WARN("Renderer backend not initialized. Skipping resize...");
+    }
+}
+
 b8 renderer_begin_frame(f32 delta_time) {
     return backend->begin_frame(backend, delta_time);
 }
@@ -41,6 +49,7 @@ b8 renderer_end_frame(f32 delta_time) {
 }
 
 b8 renderer_draw_frame(render_packet* packet) {
+    LOG_TRACE("Drawing frame %d", backend->frame_number);
     if (renderer_begin_frame(packet->delta_time)) {
         b8 result = renderer_end_frame(packet->delta_time);
         if (!result) {
