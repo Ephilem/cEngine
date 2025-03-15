@@ -102,3 +102,11 @@ typedef char b8;
 #endif
 
 #define cCLAMP(value, min, max) ((value) < (min) ? (min) : (value) > (max) ? (max) : (value))
+
+#ifdef _MSC_VER
+#define cINLINE __forceinline
+#define cNOINLINE __declspec(noinline)
+#else
+#define cINLINE static inline
+#define cNOINLINE __attribute__((noinline))
+#endif

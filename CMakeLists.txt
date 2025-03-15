@@ -54,7 +54,9 @@ add_library(cEngine
         src/renderer/vulkan/vulkan_fence.c
         src/renderer/vulkan/vulkan_fence.h
         src/renderer/vulkan/vulkan_utils.c
-        src/renderer/vulkan/vulkan_utils.h)
+        src/renderer/vulkan/vulkan_utils.h
+        src/math/math_types.h
+        src/math/cmath.h)
 
 target_include_directories(
         cEngine
