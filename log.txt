@@ -1,0 +1,147 @@
+/home/raph/CLionProjects/cEngine/cmake-build-debug/example/cEngine_example
+[INFO]	 Initializing logging
+[INFO]	 Input initialized
+[TRACE]	 Event listener registered for code 1 (callback: 0x555555558fcd)
+[TRACE]	 Event listener registered for code 2 (callback: 0x555555559033)
+[TRACE]	 Event listener registered for code 3 (callback: 0x555555559033)
+[TRACE]	 Event listener registered for code 8 (callback: 0x555555559170)
+[INFO]	 Initializing renderer...
+[DEBUG]	 Renderer backend: Vulkan
+[TRACE]	 Needed extensions:
+[TRACE]	  - VK_KHR_surface
+[TRACE]	  - VK_KHR_xcb_surface
+[TRACE]	  - VK_EXT_debug_utils
+[DEBUG]	 Loading vulkan validation layers for debugging
+[TRACE]	 Searching for layer : VK_LAYER_KHRONOS_validation
+[TRACE]	 Found!
+[DEBUG]	 Enabled layers:
+[DEBUG]	  - VK_LAYER_KHRONOS_validation
+[DEBUG]	 Loading the debugger
+[DEBUG]	 Creating surface for Vulkan. Current platform: Linux with XCB (X11)
+[DEBUG]	 Creating Vulkan device
+[DEBUG]	 linux_read_sorted_physical_devices:
+[DEBUG]	      Original order:
+[DEBUG]	            [0] NVIDIA GeForce RTX 3060
+[DEBUG]	      Sorted order:
+[DEBUG]	            [0] NVIDIA GeForce RTX 3060  
+[TRACE]	 Copying old device 0 into new device 0
+[DEBUG]	 linux_read_sorted_physical_devices:
+[DEBUG]	      Original order:
+[DEBUG]	            [0] NVIDIA GeForce RTX 3060
+[DEBUG]	      Sorted order:
+[DEBUG]	            [0] NVIDIA GeForce RTX 3060  
+[TRACE]	 Copying old device 0 into new device 0
+[TRACE]	 Number of queue families: 6
+[TRACE]	 Graphics | Compute | Transfer | Present | Name
+[TRACE]	     1    |    1    |    1     |    1    | NVIDIA GeForce RTX 3060
+[TRACE]	 Device meets all requirements
+[TRACE]	 Graphics Family Index: 0
+[TRACE]	 Compute Family Index: 2
+[TRACE]	 Transfer Family Index: 5
+[TRACE]	 Present Family Index: 2
+[TRACE]	 Device supports extension VK_KHR_swapchain
+[TRACE]	 Selected device: NVIDIA GeForce RTX 3060
+[TRACE]	 Device Type: Discrete GPU
+[TRACE]	 GPU Driver version: 565.308.0
+[TRACE]	 Vulkan API version: 1.3.289
+[TRACE]	 === Memory Types ===
+[TRACE]	 Type          | Size (GiB) | Location
+[TRACE]	 --------------|------------|----------
+[TRACE]	 Device Local  |      23.45 | GPU
+[TRACE]	 Shared System |      12.00 | System
+[TRACE]	 Device Local  |      12.00 | GPU
+[TRACE]	 Shared System |      23.45 | System
+[TRACE]	 Shared System |      23.45 | System
+[TRACE]	 Shared System |       0.24 | System
+[TRACE]	 =====================
+[DEBUG]	 Creating the logical device with 3 queue families
+[DEBUG]	 Inserted device layer "VK_LAYER_KHRONOS_validation" (libVkLayer_khronos_validation.so)
+[DEBUG]	 vkCreateDevice layer callstack setup to:
+[DEBUG]	    <Application>
+[DEBUG]	      ||
+[DEBUG]	    <Loader>
+[DEBUG]	      ||
+[DEBUG]	    VK_LAYER_KHRONOS_validation
+[DEBUG]	            Type: Explicit
+[DEBUG]	            Enabled By: By the Application
+[DEBUG]	            Manifest: /usr/share/vulkan/explicit_layer.d/VkLayer_khronos_validation.json
+[DEBUG]	            Library:  libVkLayer_khronos_validation.so
+[DEBUG]	      ||
+[DEBUG]	    <Device>
+[DEBUG]	        Using "NVIDIA GeForce RTX 3060" with driver: "libGLX_nvidia.so.0"
+[DEBUG]	 Creating a command pool for the graphics queue
+[DEBUG]	 Starting swapchain creation
+[TRACE]	 Creating image view 0 (pointer 0xee647e0000000009)
+[TRACE]	 Creating image view 1 (pointer 0xcfef35000000000a)
+[TRACE]	 Creating image view 2 (pointer 0xec4bec000000000b)
+[TRACE]	 Creating image view 3 (pointer 0xe88693000000000c)
+[DEBUG]	 Swapchain created successfully
+[DEBUG]	 Creating render pass
+[TRACE]	 Regenerating framebuffer 0 (frambuffer pointer 0x5555555d55e8 | image view pointer 0xee647e0000000009)
+[TRACE]	 Regenerating framebuffer 1 (frambuffer pointer 0x5555555d5608 | image view pointer 0xcfef35000000000a)
+[TRACE]	 Regenerating framebuffer 2 (frambuffer pointer 0x5555555d5628 | image view pointer 0xec4bec000000000b)
+[TRACE]	 Regenerating framebuffer 3 (frambuffer pointer 0x5555555d5648 | image view pointer 0xe88693000000000c)
+[INFO]	 Vulkan renderer backend initialized
+[INFO]	 Game initialized
+[INFO]	 Game resized
+[INFO]	 Platform started successfully
+[DEBUG]	 System Memory Usage:
+  UNKNOWN    : 0.00 B
+  ARRAY      : 0.00 B
+  DARRAY     : 4.98 Kib
+  DICT       : 0.00 B
+  RING_QUEUE : 0.00 B
+  BST        : 0.00 B
+  STRING     : 0.00 B
+  APPLICATION: 4.00 B
+  JOB        : 0.00 B
+  RENDERER   : 208.00 B
+  VULKAN     : 0.00 B
+
+[WARN]	 An unhandled X11 event was received: 21
+[WARN]	 An unhandled X11 event was received: 19
+[WARN]	 An unhandled X11 event was received: 12
+[WARN]	 An unhandled X11 event was received: 12
+[WARN]	 An unhandled X11 event was received: 12
+[INFO]	 Game resized
+[DEBUG]	 Renderer backend called to resize to 800x600. New generation 1
+[TRACE]	 Drawing frame 0
+[DEBUG]	 recreate_swapchain: Recreating the swapchain
+[DEBUG]	 Destroying swapchain
+[DEBUG]	 Starting swapchain creation
+[TRACE]	 Creating image view 0 (pointer 0xab64de0000000020)
+[TRACE]	 Creating image view 1 (pointer 0xc4f3070000000021)
+[TRACE]	 Creating image view 2 (pointer 0x301e6c0000000022)
+[TRACE]	 Creating image view 3 (pointer 0xa7c5450000000023)
+[DEBUG]	 Swapchain created successfully
+[TRACE]	 Regenerating framebuffer 0 (frambuffer pointer 0x5555555d55e8 | image view pointer 0xab64de0000000020)
+[TRACE]	 Regenerating framebuffer 1 (frambuffer pointer 0x5555555d5608 | image view pointer 0xc4f3070000000021)
+[TRACE]	 Regenerating framebuffer 2 (frambuffer pointer 0x5555555d5628 | image view pointer 0x301e6c0000000022)
+[TRACE]	 Regenerating framebuffer 3 (frambuffer pointer 0x5555555d5648 | image view pointer 0xa7c5450000000023)
+[DEBUG]	 Resized the swapchain, booting out of the frame
+[WARN]	 Failed to begin frame. Skipping frame...
+[TRACE]	 Drawing frame 0
+[TRACE]	 Begin render pass on frame buffer 0x5555555d5648 (with image view 0xa7c5450000000023)
+[TRACE]	 Drawing frame 1
+[TRACE]	 Begin render pass on frame buffer 0x5555555d5628 (with image view 0x301e6c0000000022)
+[TRACE]	 Drawing frame 2
+[TRACE]	 Begin render pass on frame buffer 0x5555555d5608 (with image view 0xc4f3070000000021)
+[TRACE]	 Drawing frame 3
+[TRACE]	 Begin render pass on frame buffer 0x5555555d55e8 (with image view 0xab64de0000000020)
+[TRACE]	 Drawing frame 4
+[TRACE]	 Begin render pass on frame buffer 0x5555555d5648 (with image view 0xa7c5450000000023)
+[DEBUG]	 vulkan_swapchain_present: Swapchain out of date or suboptimal, recreating...
+[DEBUG]	 Destroying swapchain
+[DEBUG]	 Starting swapchain creation
+[TRACE]	 Creating image view 0 (pointer 0xa21a4e0000000030)
+[TRACE]	 Creating image view 1 (pointer 0xea7170000000031)
+[TRACE]	 Creating image view 2 (pointer 0x4fac1c0000000032)
+[TRACE]	 Creating image view 3 (pointer 0xa808d50000000033)
+[DEBUG]	 Swapchain created successfully
+[TRACE]	 Drawing frame 5
+[TRACE]	 Begin render pass on frame buffer 0x5555555d5648 (with image view 0xa808d50000000033)
+[ERROR]	 Validation Error: [ VUID-VkRenderPassBeginInfo-framebuffer-parameter ] Object 0: handle = 0xd5b26f0000000010, type = VK_OBJECT_TYPE_RENDER_PASS; Object 1: handle = 0xba7514000000002a, type = VK_OBJECT_TYPE_FRAMEBUFFER; Object 2: handle = 0xa7c5450000000023, type = VK_OBJECT_TYPE_IMAGE_VIEW; | MessageID = 0xe02fa864 | vkCmdBeginRenderPass(): pCreateInfo->pAttachments[0] VkImageView 0xa7c5450000000023[] is invalid.
+The Vulkan spec states: framebuffer must be a valid VkFramebuffer handle (https://www.khronos.org/registry/vulkan/specs/1.3-extensions/html/vkspec.html#VUID-VkRenderPassBeginInfo-framebuffer-parameter)
+[ERROR]	 Validation Error: [ VUID-VkRenderPassBeginInfo-framebuffer-parameter ] Object 0: handle = 0xd5b26f0000000010, type = VK_OBJECT_TYPE_RENDER_PASS; Object 1: handle = 0xba7514000000002a, type = VK_OBJECT_TYPE_FRAMEBUFFER; Object 2: handle = 0xa2eb680000000026, type = VK_OBJECT_TYPE_IMAGE_VIEW; | MessageID = 0xe02fa864 | vkCmdBeginRenderPass(): pCreateInfo->pAttachments[1] VkImageView 0xa2eb680000000026[] is invalid.
+The Vulkan spec states: framebuffer must be a valid VkFramebuffer handle (https://www.khronos.org/registry/vulkan/specs/1.3-extensions/html/vkspec.html#VUID-VkRenderPassBeginInfo-framebuffer-parameter)
+Signal: SIGSEGV (Segmentation fault)

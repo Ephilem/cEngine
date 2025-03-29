@@ -1,6 +1,7 @@
 #include "vulkan_framebuffer.h"
 
 #include "core/cmemory.h"
+#include "core/logger.h"
 
 void vulkan_framebuffer_create(
     vulkan_context *context,

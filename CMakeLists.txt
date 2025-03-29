@@ -3,6 +3,13 @@ project(cEngine C)
 
 set(CMAKE_C_STANDARD 11)
 
+# Trouver le compilateur GLSL (glslc de Vulkan)
+find_program(GLSL_COMPILER glslc)
+
+if(NOT GLSL_COMPILER)
+    message(FATAL_ERROR "glslc non trouvé! Veuillez installer le SDK Vulkan.")
+endif()
+
 find_package(PkgConfig REQUIRED)
 find_package(X11 REQUIRED)
 find_package(Vulkan REQUIRED)
@@ -56,7 +63,8 @@ add_library(cEngine
         src/renderer/vulkan/vulkan_utils.c
         src/renderer/vulkan/vulkan_utils.h
         src/math/math_types.h
-        src/math/cmath.h)
+        src/math/cmath.h
+        src/math/cmath.c)
 
 target_include_directories(
         cEngine
@@ -68,5 +76,47 @@ target_link_libraries(cEngine PRIVATE
         ${XCB_LIBRARIES}
         vulkan
         X11-xcb)
+
+# Fonction pour compiler les shaders
+function(compile_shader TARGET SHADER)
+    get_filename_component(SHADER_NAME ${SHADER} NAME)
+    set(SHADER_OUTPUT "${CMAKE_BINARY_DIR}/shaders/${SHADER_NAME}.spv")
+
+    # Créer le répertoire de sortie s'il n'existe pas
+    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/shaders)
+
+    # Définir la commande de compilation du shader
+    add_custom_command(
+            OUTPUT ${SHADER_OUTPUT}
+            COMMAND ${GLSL_COMPILER} ${SHADER} -o ${SHADER_OUTPUT}
+            DEPENDS ${SHADER}
+            COMMENT "Compilation du shader ${SHADER_NAME}"
+    )
+
+    # Ajouter le fichier de sortie à la propriété SHADER_OUTPUTS du target
+    set_property(
+            TARGET ${TARGET}
+            APPEND PROPERTY SHADER_OUTPUTS ${SHADER_OUTPUT}
+    )
+endfunction()
+
+# Rechercher tous les fichiers de shaders
+file(GLOB SHADER_SOURCES "src/shaders/*.vert" "src/shaders/*.frag" "src/shaders/*.comp")
+
+# Compiler chaque shader trouvé
+foreach(SHADER ${SHADER_SOURCES})
+    compile_shader(cEngine ${SHADER})
+endforeach()
+
+# Créer une cible personnalisée pour les shaders
+get_target_property(SHADER_OUTPUTS cEngine SHADER_OUTPUTS)
+if(SHADER_OUTPUTS)
+    add_custom_target(Shaders DEPENDS ${SHADER_OUTPUTS})
+    add_dependencies(cEngine Shaders)
+else()
+    # Si aucun shader n'est présent, créer une cible vide
+    add_custom_target(Shaders)
+    add_dependencies(cEngine Shaders)
+endif()
 
 add_subdirectory(example)

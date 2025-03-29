@@ -41,13 +41,13 @@ typedef union vec4_u {
     union {
         struct {
             union {
-                f32 x,r,s,u;
+                f32 x,r,s;
             };
             union {
-                f32 y,g,t,v;
+                f32 y,g,t;
             };
             union {
-                f32 z,b,p,w;
+                f32 z,b,p;
             };
             union {
                 f32 w,a,q;
@@ -58,4 +58,10 @@ typedef union vec4_u {
 
 typedef vec4 quat;
 
+typedef union mat4_u {
+    alignas(16) f32 data[16];
 
+#if defined(cUSE_SIMD)
+    alignas(16) _m128 rows[4];
+#endif
+} mat4;

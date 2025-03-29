@@ -49,7 +49,7 @@ b8 renderer_end_frame(f32 delta_time) {
 }
 
 b8 renderer_draw_frame(render_packet* packet) {
-    LOG_TRACE("Drawing frame %d", backend->frame_number);
+    //LOG_TRACE("Drawing frame %d", backend->frame_number);
     if (renderer_begin_frame(packet->delta_time)) {
         b8 result = renderer_end_frame(packet->delta_time);
         if (!result) {

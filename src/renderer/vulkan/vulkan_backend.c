@@ -337,7 +337,7 @@ b8 vulkan_renderer_backend_begin_frame(struct renderer_backend *backend, f32 del
     context.main_renderpass.w = context.framebuffer_width;
     context.main_renderpass.h = context.framebuffer_height;
 
-    LOG_TRACE("Begin render pass on frame buffer %p (with image view %p)", &context.swapchain.framebuffers[context.image_index], context.swapchain.views[context.image_index]);
+    //LOG_TRACE("Begin render pass on frame buffer %p (with image view %p)", &context.swapchain.framebuffers[context.image_index], context.swapchain.views[context.image_index]);
     vulkan_renderpass_begin(command_buffer, &context.main_renderpass, context.swapchain.framebuffers[context.image_index].handle);
 
     return TRUE;
