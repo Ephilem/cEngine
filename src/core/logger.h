@@ -13,7 +13,15 @@ typedef enum log_level {
     LOG_LEVEL_TRACE = 5
 } log_level;
 
-b8 initialize_logging();
+/**
+ * Initialize the logging system. call twice; once with state = 0 to get the required memory and
+ * then a second time passing allocated memory to state.
+ *
+ * @param memory_requirement a pointer to the size of memory required for the logging system
+ * @param state a pointer to the memory allocated for the logging system
+ * @return true if the logging system was initialized successfully, false otherwise
+ */
+b8 initialize_logging(u64* memory_requirement, void* state);
 void shutdown_logging();
 
 void log_output(log_level, const char* message, ...);

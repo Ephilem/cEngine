@@ -4,6 +4,7 @@
 #include "vulkan_framebuffer.h"
 #include "vulkan_image.h"
 #include "vulkan_renderpass.h"
+#include "containers/darray.h"
 #include "core/cmemory.h"
 #include "core/logger.h"
 
@@ -59,13 +60,13 @@ b8 vulkan_swapchain_acquire_next_image_index(
         // Trigger swapchain recreation, then boot out of the render loop.
         LOG_DEBUG("vulkan_swapchain_acquire_next_image_index: Swapchain out of date, recreating...");
         vulkan_swapchain_recreate(context, context->framebuffer_width, context->framebuffer_height, swapchain);
-        return FALSE;
+        return false;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         LOG_FATAL("Failed to acquire swapchain image!");
-        return FALSE;
+        return false;
     }
 
-    return TRUE;
+    return true;
 }
 
 void vulkan_swapchain_present(vulkan_context *context, vulkan_swapchain *swapchain, VkQueue graphics_queue,
@@ -119,17 +120,16 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
 
     VkExtent2D swapchain_extent = {width, height};
     swapchain->extent = swapchain_extent;
-    swapchain->max_frames_in_flight = 2;
 
     // Choose a swap surface format.
-    b8 found = FALSE;
+    b8 found = false;
     for (u32 i = 0; i < context->device.swapchain_support_info.format_count; ++i) {
         VkSurfaceFormatKHR format = context->device.swapchain_support_info.formats[i];
         // Preferred formats
         if (format.format == VK_FORMAT_B8G8R8A8_UNORM &&
             format.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
             swapchain->format = format;
-            found = TRUE;
+            found = true;
             break;
         }
     }
@@ -168,6 +168,7 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
     if (context->device.swapchain_support_info.capabilities.maxImageCount > 0 && image_count > context->device.swapchain_support_info.capabilities.maxImageCount) {
         image_count = context->device.swapchain_support_info.capabilities.maxImageCount;
     }
+    swapchain->max_frames_in_flight = image_count - 1;
 
     // Swapchain create info
     VkSwapchainCreateInfoKHR swapchain_create_info = {VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR};
@@ -248,7 +249,7 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-        TRUE,
+        true,
         VK_IMAGE_ASPECT_DEPTH_BIT,
         &swapchain->depth_attachment);
 
@@ -259,6 +260,14 @@ void create(vulkan_context *context, u32 width, u32 height, vulkan_swapchain *sw
 void destroy(vulkan_context *context, vulkan_swapchain *swapchain) {
     vkDeviceWaitIdle(context->device.logical);
     LOG_DEBUG("Destroying swapchain");
+
+    // Destroy framebuffers but keep the array
+    if (swapchain->framebuffers) {
+        for (u32 i = 0; i < swapchain->image_count; ++i) {
+            vulkan_framebuffer_destroy(context, &swapchain->framebuffers[i]);
+        }
+    }
+
     vulkan_image_destroy(context, &swapchain->depth_attachment);
 
     for (u32 i = 0; i < swapchain->image_count; ++i) {

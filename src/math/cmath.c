@@ -3,7 +3,7 @@
 #include "platform/platform.h"
 #include <math.h>
 
-static b8 rand_seeded = FALSE;
+static b8 rand_seeded = false;
 
 f32 c_sinf(f32 x) {
     return sinf(x);
@@ -32,7 +32,7 @@ f32 c_absf(f32 x) {
 i32 crandom() {
     if (!rand_seeded) {
         srand((u32)platform_get_absolute_time());
-        rand_seeded = TRUE;
+        rand_seeded = true;
     }
     return rand();
 }
@@ -44,7 +44,7 @@ i32 crandom_in_range(i32 min, i32 max) {
 f32 fcrandom() {
     if (!rand_seeded) {
         srand((u32)platform_get_absolute_time());
-        rand_seeded = TRUE;
+        rand_seeded = true;
     }
     return (f32)rand() / (f32)RAND_MAX;
 }

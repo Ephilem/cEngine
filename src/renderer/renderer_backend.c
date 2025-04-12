@@ -22,11 +22,11 @@ b8 renderer_backend_create(renderer_backend_type type, struct platform_state* pl
             return renderer_backend_directx_create(platform_state, out_backend);
         } break;*/
         default: {
-            return FALSE;
+            return false;
         } break;
     }
 
-    return FALSE;
+    return false;
 }
 
 void renderer_backend_destroy(renderer_backend* backend) {

@@ -27,7 +27,7 @@ void vulkan_swapchain_destroy(
  * @param image_available_semaphore semaphore to signal when the image is available
  * @param fence fence to signal when the image is available
  * @param out_image_index index of the image to render
- * @return TRUE if the image is acquired, FALSE otherwise
+ * @return true if the image is acquired, false otherwise
  */
 b8 vulkan_swapchain_acquire_next_image_index(
     vulkan_context* context,

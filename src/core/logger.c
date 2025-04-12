@@ -9,15 +9,29 @@
 
 #include "platform/platform.h"
 
+typedef struct logger_system_state {
+    b8 initialized;
 
-b8 initialize_logging() {
-    LOG_INFO("Initializing logging");
+} logger_system_state;
+
+static logger_system_state* state_ptr; // copy to the logger state
+
+b8 initialize_logging(u64* memory_requirement, void* state) {
+    *memory_requirement = sizeof(logger_system_state);
+    if (state == 0) {
+        return false;
+    }
+
+    state_ptr = state;
+    state_ptr->initialized = true;
+
     // TODO: create log file
-    return TRUE;
+    return true;
 }
 
 void shutdown_logging() {
     // TODO: Cleaning up logging and write queued entries
+    state_ptr = 0;
 }
 
 void log_output(log_level level, const char* message, ...) {
@@ -25,7 +39,7 @@ void log_output(log_level level, const char* message, ...) {
     b8 is_error = level <= LOG_LEVEL_ERROR;
 
     const i32 message_length = 32000;
-    char out_message[message_length];
+    char out_message[32000];
     memset(out_message, 0, sizeof(out_message));
 
     __builtin_va_list arg_ptr; // pointer to the list of arguments
@@ -33,7 +47,7 @@ void log_output(log_level level, const char* message, ...) {
     vsnprintf(out_message, message_length, message, arg_ptr); // write formatted output to the string
     va_end(arg_ptr); // end using the list of arguments
 
-    char temp[message_length];
+    char temp[32000];
     sprintf(temp, "%s\t %s", level_strings[level], out_message);
 
     if (is_error) {

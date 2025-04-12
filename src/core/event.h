@@ -27,26 +27,26 @@ typedef struct event_context {
 // Return true if the event was handled and should not be propagated further
 typedef b8 (*PFN_on_event)(u16 code, void* sender, void* listener_inst, event_context data);
 
-b8 initialize_event();
+b8 initialize_event(u64* memory_requirement, void* state);
 void event_shutdown();
 
 /**
  * Register to listen for when events are sent with the given code. Events with duplicate
- * listener/callback combos will not be registered again and will cause this to return FALSE
+ * listener/callback combos will not be registered again and will cause this to return false
  * @param code The event code to listen for
  * @param listener The listener instance that will be passed to the callback
  * @param on_event The callback to be called when the event is sent
- * @return TRUE if the event was registered, FALSE if the event was not registered
+ * @return true if the event was registered, false if the event was not registered
  */
 b8 event_register(u16 code, void* listener, PFN_on_event on_event);
 
 /**
  * Unregister a listener from an event are sent with the given code. If no matching
- * registration is found, this function returns FALSE.
+ * registration is found, this function returns false.
  * @param code The event code to unregister from
  * @param listener The listener instance that was passed to the callback
  * @param on_event The callback that was called when the event was sent
- * @return TRUE if the event was unregistered, FALSE if the event was not unregistered
+ * @return true if the event was unregistered, false if the event was not unregistered
  */
 b8 event_unregister(u16 code, void* listener, PFN_on_event on_event);
 

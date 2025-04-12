@@ -5,6 +5,7 @@
 typedef enum memory_tag {
     MEMORY_TAG_UNKNOWN,
     MEMORY_TAG_ARRAY,
+    MEMORY_TAG_LINEAR_ALLOCATOR,
     MEMORY_TAG_DARRAY,
     MEMORY_TAG_DICT,
     MEMORY_TAG_RING_QUEUE,
@@ -18,7 +19,7 @@ typedef enum memory_tag {
     MEMORY_TAG_MAX_TAGS,
 } memory_tag;
 
-void initialize_memory();
+b8 initialize_memory(u64* memory_requirement, void* state);
 void shutdown_memory();
 
 void* callocate(u64, memory_tag tag);
@@ -33,4 +34,4 @@ void* cset_memory(void* dest, i32 value, u64 size);
 
 char* get_memory_usage_str();
 
-
+u64 get_memory_alloc_count();

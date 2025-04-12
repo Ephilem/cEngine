@@ -59,8 +59,8 @@ void vulkan_command_buffer_reset(vulkan_command_buffer *command_buffer) {
 
 void vulkan_command_buffer_allocate_and_begin_single_use(vulkan_context *context, VkCommandPool pool,
     vulkan_command_buffer *out_command_buffer) {
-    vulkan_command_buffer_allocate_from_pool(context, pool, TRUE, out_command_buffer);
-    vulkan_command_buffer_begin_recording(out_command_buffer, TRUE, FALSE, FALSE);
+    vulkan_command_buffer_allocate_from_pool(context, pool, true, out_command_buffer);
+    vulkan_command_buffer_begin_recording(out_command_buffer, true, false, false);
 }
 
 void vulkan_command_buffer_end_single_use(vulkan_context *context, VkCommandPool pool,

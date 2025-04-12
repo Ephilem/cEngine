@@ -7,6 +7,7 @@
 #include "core/event.h"
 #include "core/logger.h"
 #include "containers/darray.h"
+#include "core/cmemory.h"
 
 #include <xcb/xcb.h>
 #include <X11/keysym.h>
@@ -25,6 +26,7 @@
 
 
 typedef struct internal_state {
+    b8 initialized;
     Display* display;
     xcb_connection_t* connection;
     xcb_screen_t* screen;
@@ -32,79 +34,124 @@ typedef struct internal_state {
     xcb_atom_t wm_delete_window;
     xcb_atom_t wm_protocols;
     VkSurfaceKHR surface;
+    
+    // Informations sur la fenêtre
+    const char* window_title;
+    i32 start_x;
+    i32 start_y;
+    i32 window_width;
+    i32 window_height;
 } internal_state;
 
-keys translate_keycode(u32 x_keycode);
+static internal_state* state_ptr;
 
-b8 platform_startup(
-    platform_state* platform_state,
-    const char* window_title,
-    i32 x,
-    i32 y,
-    i32 window_width,
-    i32 window_height
-) {
-    // setup the internal state
-    platform_state->internal_state = malloc(sizeof(internal_state));
-    internal_state* state = (internal_state*)platform_state->internal_state;
-
-    // connect to the x server
-    state->display = XOpenDisplay(NULL);
-
-    XAutoRepeatOff(state->display); // /!\ global to the os
-
-    // get connection
-    state->connection = XGetXCBConnection(state->display);
-
-    if (xcb_connection_has_error(state->connection)) {
-        LOG_FATAL("Failed to connect to the x server. Exiting...");
-        return FALSE;
+b8 initialize_platform(u64* memory_requirement, void* state) {
+    *memory_requirement = sizeof(internal_state);
+    if (state == 0) {
+        return false;
     }
 
-    // get info
-    const struct xcb_setup_t* setup = xcb_get_setup(state->connection);
+    state_ptr = state;
+    czero_memory(state_ptr, sizeof(internal_state));
+    state_ptr->initialized = true;
 
-    // get the first screen
+    LOG_INFO("Using XCB for the windowing system");
+    
+    return true;
+}
+
+void shutdown_platform() {
+    if (state_ptr) {
+        // Si une fenêtre a été créée, la fermer
+        if (state_ptr->display) {
+            XAutoRepeatOn(state_ptr->display);
+            if (state_ptr->window) {
+                xcb_destroy_window(state_ptr->connection, state_ptr->window);
+            }
+            xcb_disconnect(state_ptr->connection);
+        }
+        
+        state_ptr->initialized = false;
+    }
+}
+
+keys translate_keycode(u32 x_keycode);
+b8 create_window(platform_state* platform_state) {
+    if (!state_ptr || !state_ptr->initialized) {
+        LOG_ERROR("Platform system not initialized. Cannot create window.");
+        return false;
+    }
+    
+    // Récupérer les informations de la fenêtre
+    const char* window_title = platform_state->window_title;
+    i32 x = platform_state->x;
+    i32 y = platform_state->y;
+    i32 window_width = platform_state->width;
+    i32 window_height = platform_state->height;
+    
+    // Sauvegarder les information de la fenêtre dans l'état interne
+    state_ptr->window_title = window_title;
+    state_ptr->start_x = x;
+    state_ptr->start_y = y;
+    state_ptr->window_width = window_width;
+    state_ptr->window_height = window_height;
+    
+    // Connecter au serveur X
+    state_ptr->display = XOpenDisplay(NULL);
+    XAutoRepeatOff(state_ptr->display); // /!\ global to the os
+
+    // Obtenir la connexion
+    state_ptr->connection = XGetXCBConnection(state_ptr->display);
+
+    if (xcb_connection_has_error(state_ptr->connection)) {
+        LOG_FATAL("Failed to connect to the X server. Exiting...");
+        return false;
+    }
+
+    // Obtenir les informations
+    const struct xcb_setup_t* setup = xcb_get_setup(state_ptr->connection);
+
+    // Obtenir le premier écran
     xcb_screen_iterator_t it = xcb_setup_roots_iterator(setup);
     int screen_p = 0;
     for (i32 s = screen_p; s > 0; s--) {
         xcb_screen_next(&it);
     }
 
-    // assign a screen
-    state->screen = it.data;
+    // Assigner un écran
+    state_ptr->screen = it.data;
 
-    // allocate the windo to be created
-    state->window = xcb_generate_id(state->connection);
+    // Allouer l'ID de la fenêtre
+    state_ptr->window = xcb_generate_id(state_ptr->connection);
 
-    // listening to event that we need
+    // Écouter les événements dont nous avons besoin
     u32 event_mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK;
     u32 event_values = XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE | XCB_EVENT_MASK_POINTER_MOTION |
                        XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE |
                        XCB_EVENT_MASK_EXPOSURE | XCB_EVENT_MASK_STRUCTURE_NOTIFY;
 
-    // send the background color and our event
-    u32 value_list[] = {state->screen->black_pixel, event_values};
+    // Envoyer la couleur d'arrière-plan et nos événements
+    u32 value_list[] = {state_ptr->screen->black_pixel, event_values};
 
     xcb_void_cookie_t window_cookie = xcb_create_window(
-        state->connection,
+        state_ptr->connection,
         XCB_COPY_FROM_PARENT,
-        state->window,
-        state->screen->root,
+        state_ptr->window,
+        state_ptr->screen->root,
         x, y,
         window_width, window_height,
-        0, // no border
+        0, // pas de bordure
         XCB_WINDOW_CLASS_INPUT_OUTPUT,
-        state->screen->root_visual,
+        state_ptr->screen->root_visual,
         event_mask,
         value_list
     );
 
-    // set the title of the window
+    // Définir le titre de la fenêtre
     xcb_change_property(
-        state->connection,
+        state_ptr->connection,
         XCB_PROP_MODE_REPLACE,
-        state->window,
+        state_ptr->window,
         XCB_ATOM_WM_NAME,
         XCB_ATOM_STRING,
         8,
@@ -112,64 +159,54 @@ b8 platform_startup(
         window_title
     );
 
-    // notify for certains events
+    // Notifier certains événements
     xcb_intern_atom_cookie_t wm_delete_cookie = xcb_intern_atom(
-        state->connection,
+        state_ptr->connection,
         0,
         strlen("WM_DELETE_WINDOW"),
         "WM_DELETE_WINDOW");
     xcb_intern_atom_cookie_t wm_protocols_cookie = xcb_intern_atom(
-        state->connection,
+        state_ptr->connection,
         0,
         strlen("WM_PROTOCOLS"),
         "WM_PROTOCOLS");
     xcb_intern_atom_reply_t *wm_delete_reply = xcb_intern_atom_reply(
-        state->connection,
+        state_ptr->connection,
         wm_delete_cookie,
         NULL);
     xcb_intern_atom_reply_t *wm_protocols_reply = xcb_intern_atom_reply(
-        state->connection,
+        state_ptr->connection,
         wm_protocols_cookie,
         NULL);
-    state->wm_delete_window = wm_delete_reply->atom;
-    state->wm_protocols = wm_protocols_reply->atom;
+    state_ptr->wm_delete_window = wm_delete_reply->atom;
+    state_ptr->wm_protocols = wm_protocols_reply->atom;
 
-    // change property so we can receive the delete message
+    // Changer la propriété pour recevoir le message de suppression
     xcb_change_property(
-        state->connection,
+        state_ptr->connection,
         XCB_PROP_MODE_REPLACE,
-        state->window,
-        state->wm_protocols,
+        state_ptr->window,
+        state_ptr->wm_protocols,
         XCB_ATOM_ATOM,
         32,
         1,
-        &state->wm_delete_window
+        &state_ptr->wm_delete_window
     );
 
-    // map the window to the screen
-    xcb_map_window(state->connection, state->window);
+    // Mapper la fenêtre à l'écran
+    xcb_map_window(state_ptr->connection, state_ptr->window);
 
-    // flush the request. that make sure that we receive all the data
-    i32 stream_result = xcb_flush(state->connection);
+    // Flush de la requête
+    i32 stream_result = xcb_flush(state_ptr->connection);
     if (stream_result <= 0) {
         LOG_FATAL("Failed to flush the request. Exiting...");
-        return FALSE;
+        return false;
     }
+    
+    // Stocker le platform_state pour utilisation ultérieure
+    platform_state->internal_state = state_ptr;
 
-    return TRUE;
-}
-
-void platform_shutdown(platform_state* platform_state) {
-    internal_state* state = (internal_state*)platform_state->internal_state;
-
-    XAutoRepeatOn(state->display);
-    xcb_destroy_window(state->connection, state->window);
-
-    // close the connection
-    xcb_disconnect(state->connection);
-
-    // free the internal state
-    free(state);
+    return true;
 }
 
 b8 platform_pump_messages(platform_state* platform_state) {
@@ -178,7 +215,7 @@ b8 platform_pump_messages(platform_state* platform_state) {
     xcb_generic_event_t* event;
     xcb_client_message_event_t *cm;
 
-    b8 quit_flagged = FALSE;
+    b8 quit_flagged = false;
     while ((event = xcb_poll_for_event(state->connection))) {
         //event = xcb_poll_for_event(state->connection);
         if (event == 0) {
@@ -245,7 +282,7 @@ b8 platform_pump_messages(platform_state* platform_state) {
                 cm = (xcb_client_message_event_t*)event;
                 if (cm->data.data32[0] == state->wm_delete_window) {
                     // if the window is closed
-                    quit_flagged = TRUE;
+                    quit_flagged = true;
                 }
             } break;
 
@@ -321,11 +358,11 @@ b8 platform_create_vulkan_surface(platform_state* platform_state, vulkan_context
      &state->surface);
     if (result != VK_SUCCESS) {
         LOG_ERROR("Vulkan surface creation failed");
-        return FALSE;
+        return false;
     }
 
     context->surface = state->surface;
-    return TRUE;
+    return true;
 }
 
 keys translate_keycode(u32 x_keycode) {
@@ -473,6 +510,7 @@ keys translate_keycode(u32 x_keycode) {
             return KEY_SCROLL;
         case XK_KP_Equal:
             return KEY_NUMPAD_EQUAL;
+
         case XK_Shift_L:
             return KEY_LSHIFT;
         case XK_Shift_R:
@@ -481,9 +519,11 @@ keys translate_keycode(u32 x_keycode) {
             return KEY_LCONTROL;
         case XK_Control_R:
             return KEY_RCONTROL;
-        // case XK_Menu: return KEY_LMENU;
-        case XK_Menu:
-            return KEY_RMENU;
+        case XK_Alt_L:
+            return KEY_LALT;
+        case XK_Alt_R:
+            return KEY_RALT;
+
         case XK_semicolon:
             return KEY_SEMICOLON;
         case XK_plus:

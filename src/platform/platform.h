@@ -2,20 +2,22 @@
 
 #include "define.h"
 
+// La structure platform_state est utilisée pour stocker l'état de la fenêtre active
 typedef struct platform_state {
     void* internal_state;
+    
+    // Ces informations sont nécessaires lors de l'initialisation
+    const char* window_title;
+    i32 x;
+    i32 y;
+    i32 width;
+    i32 height;
 } platform_state;
 
-b8 platform_startup(
-    struct platform_state* state,
-    const char* window_title,
-    i32 x,
-    i32 y,
-    i32 window_width,
-    i32 window_height
-);
+b8 initialize_platform(u64* memory_requirement, void* state);
+void shutdown_platform();
 
-void platform_shutdown(platform_state* state);
+b8 create_window(platform_state* state);
 
 b8 platform_pump_messages(platform_state* state);
 

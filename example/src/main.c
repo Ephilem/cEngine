@@ -17,5 +17,7 @@ b8 create_application(app* application_inst) {
 
     application_inst->state = callocate(sizeof(game_state), MEMORY_TAG_APPLICATION);
 
-    return TRUE;
+    application_inst->application_state = 0;
+
+    return true;
 }

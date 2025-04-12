@@ -13,8 +13,6 @@ extern b8 create_application(app* application_inst);
  */
 int main(void) {
 
-    initialize_memory();
-
     app app_inst;
     if (!create_application(&app_inst)) {
         LOG_FATAL("Failed to create application");
