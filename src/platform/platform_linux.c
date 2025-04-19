@@ -318,12 +318,12 @@ void* platform_set_memory(void* dest, i32 value, u64 size) {
 
 void platform_console_write(const char* message, u8 color) {
     const char* color_strings[] = {"0;41;30", "0;31", "0;33", "0;32", "0;34", "0;30"};
-    printf("\033[%sm%s\033[0m\n", color_strings[color], message);
+    printf("\033[%sm%s\033[0m", color_strings[color], message);
 }
 
 void platform_console_write_error(const char* message, u8 color) {
     const char* color_strings[] = {"0;41;30", "0;31", "0;33", "0;32", "0;34", "0;30"};
-    fprintf(stderr, "\033[%sm%s\033[0m\n", color_strings[color], message);
+    fprintf(stderr, "\033[%sm%s\033[0m", color_strings[color], message);
 }
 
 f64 platform_get_absolute_time() {

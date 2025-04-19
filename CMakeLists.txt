@@ -67,7 +67,17 @@ add_library(cEngine
         src/math/cmath.h
         src/math/cmath.c
         src/memory/linear_allocator.h
-        src/memory/linear_allocator.c)
+        src/memory/linear_allocator.c
+        src/renderer/vulkan/shaders/vulkan_object_shader.h
+        src/renderer/vulkan/shaders/vulkan_object_shader.c
+        src/renderer/vulkan/vulkan_shader_utils.c
+        src/renderer/vulkan/vulkan_shader_utils.h
+        src/platform/filesystem.c
+        src/platform/filesystem.h
+        src/renderer/vulkan/vulkan_pipeline.c
+        src/renderer/vulkan/vulkan_pipeline.h
+        src/renderer/vulkan/vulkan_buffer.c
+        src/renderer/vulkan/vulkan_buffer.h)
 
 target_include_directories(
         cEngine

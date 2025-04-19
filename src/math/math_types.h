@@ -65,3 +65,9 @@ typedef union mat4_u {
     alignas(16) _m128 rows[4];
 #endif
 } mat4;
+
+typedef struct vertex_3d {
+    vec3 position;
+    //vec3 normal;
+    //vec2 uv;
+} vertex_3d;

@@ -10,6 +10,16 @@
         cASSERT(expr == VK_SUCCESS); \
     }
 
+typedef struct vulkan_buffer {
+    u64 total_size;
+    VkBuffer handle;
+    VkBufferUsageFlagBits usage;
+    b8 is_locked;
+    VkDeviceMemory memory;
+    i32 memory_index;
+    u32 mmeory_property_flags;
+} vulkan_buffer;
+
 typedef struct vulkan_swapchain_support_info {
     VkSurfaceCapabilitiesKHR capabilities;
     u32 format_count;
@@ -115,6 +125,27 @@ typedef struct vulkan_fence {
     b8 is_signaled;
 } vulkan_fence;
 
+typedef struct vulkan_shader_stage {
+    VkShaderModuleCreateInfo create_info;
+    VkShaderModule handle;
+    VkPipelineShaderStageCreateInfo shader_stage_create_info;
+} vulkan_shader_stage;
+
+typedef struct vulkan_pipeline {
+    VkPipeline handle;
+    VkPipelineLayout pipeline_layout;
+} vulkan_pipeline;
+
+#define OBJECT_SHADER_STAGE_COUNT 2
+typedef struct vulkan_object_shader {
+    // vertex & fragment shader
+    vulkan_shader_stage stages[OBJECT_SHADER_STAGE_COUNT];
+
+    vulkan_pipeline pipeline;
+
+
+} vulkan_object_shader;
+
 typedef struct vulkan_context {
     VkInstance instance;
     VkAllocationCallbacks* allocator;
@@ -135,6 +166,13 @@ typedef struct vulkan_context {
 
     vulkan_swapchain swapchain;
     vulkan_renderpass main_renderpass; // the main renderpass for the application
+
+    // buffers
+    vulkan_buffer object_vertex_buffer;
+    vulkan_buffer object_index_buffer;
+
+    u64 geometry_vertex_offset;
+    u64 geometry_index_offset;
 
     // darray
     vulkan_command_buffer* graphics_command_buffers; // commands buffer available for the graphics queue (one per frame)
@@ -157,4 +195,9 @@ typedef struct vulkan_context {
     i32 (*find_memory_index)(u32 type_filter, u32 property_flags); // function to find the memory index for a given type filter and property flags
 
 
+    // Shaders
+    vulkan_object_shader object_shader;
+
+
 } vulkan_context;
+
