@@ -4,6 +4,7 @@
 
 #include <vulkan/vulkan.h>
 #include "core/asserts.h"
+#include "renderer/renderer_types.inl"
 
 #define VK_CHECK(expr) \
     { \
@@ -143,7 +144,13 @@ typedef struct vulkan_object_shader {
 
     vulkan_pipeline pipeline;
 
+    VkDescriptorPool global_descriptor_pool;
+    VkDescriptorSetLayout global_descriptor_set_layout; // define the layout of the descriptor set
+    VkDescriptorSet global_descriptor_sets[4]; // One descriptor set per frame
+    b8 global_descriptor_updated[4];
 
+    global_uniform_object global_ubo;
+    vulkan_buffer global_uniform_buffer; // linked to the descriptor set
 } vulkan_object_shader;
 
 typedef struct vulkan_context {

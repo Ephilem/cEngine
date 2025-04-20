@@ -89,7 +89,8 @@ target_link_libraries(cEngine PRIVATE
         vulkan
         ${X11_LIBRARIES}
         ${XCB_LIBRARIES}
-        X11-xcb)
+        X11-xcb
+        m)
 
 function(compile_shader TARGET SHADER)
     get_filename_component(SHADER_NAME ${SHADER} NAME)

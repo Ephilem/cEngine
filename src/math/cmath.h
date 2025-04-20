@@ -185,9 +185,9 @@ cINLINE vec3 vec3_normalized(vec3 a) {
     return result;
 }
 cINLINE b8 vec3_compare(vec3 a, vec3 b, f32 tolerence) {
-    if (abs(a.x - b.x) > tolerence) return false;
-    if (abs(a.y - b.y) > tolerence) return false;
-    if (abs(a.z - b.z) > tolerence) return false;
+    if (c_absf(a.x - b.x) > tolerence) return false;
+    if (c_absf(a.y - b.y) > tolerence) return false;
+    if (c_absf(a.z - b.z) > tolerence) return false;
     return true;
 }
 cINLINE f32 vec3_distance(vec3 a, vec3 b) {

@@ -4,13 +4,20 @@
 
 #include "core/logger.h"
 #include "core/cmemory.h"
+#include "math/cmath.h"
 
 typedef struct renderer_system_state {
     b8 initialized;
+    renderer_backend backend;
+
+    mat4 projection;
+    f32 near_clip;
+    f32 far_clip;
+
+    mat4 view;
 } renderer_system_state;
 
 static renderer_system_state* state_ptr;
-static renderer_backend* backend = 0;
 
 b8 initialize_renderer(u64* memory_requirement, void* state) {
     *memory_requirement = sizeof(renderer_system_state);
@@ -21,7 +28,7 @@ b8 initialize_renderer(u64* memory_requirement, void* state) {
     state_ptr = state;
     czero_memory(state_ptr, sizeof(renderer_system_state));
     state_ptr->initialized = true;
-    
+
     return true;
 }
 
@@ -39,49 +46,77 @@ b8 renderer_initialize(const char* application_name, struct platform_state* plat
     }
 
     LOG_INFO("Initializing renderer...");
-    backend = callocate(sizeof(renderer_backend), MEMORY_TAG_RENDERER);
-    backend->frame_number = 0;
+    state_ptr->backend.frame_number = 0;
 
-    renderer_backend_create(RENDERER_BACKEND_VULKAN, platform_state, backend);
+    renderer_backend_create(RENDERER_BACKEND_VULKAN, platform_state, &state_ptr->backend);
 
-    if (!backend->initialize(backend, application_name, platform_state)) {
+    if (!state_ptr->backend.initialize(&state_ptr->backend, application_name, platform_state)) {
         LOG_FATAL("Failed to initialize renderer backend. Shutting down...");
         return false;
     }
 
+    state_ptr->projection = mat4_perspective(deg_to_rad(45.0f), 1280/720.0f, 0.1f, 1000.0f);
+    state_ptr->near_clip = 0.1f;
+    state_ptr->far_clip = 1000.0f;
+    state_ptr->view = mat4_inverse(state_ptr->view);
+
     return true;
 }
 
+void renderer_set_view(mat4 view) {
+    if (state_ptr && state_ptr->initialized) {
+        state_ptr->view = view;
+    } else {
+        LOG_WARN("Renderer backend not initialized. Skipping view update...");
+    }
+}
+
 void renderer_shutdown() {
-    if (backend) {
-        backend->shutdown(backend);
-        renderer_backend_destroy(backend);
-        cfree(backend, sizeof(renderer_backend), MEMORY_TAG_RENDERER);
-        backend = 0;
+    if (state_ptr) {
+        state_ptr->backend.shutdown(&state_ptr->backend);
+        renderer_backend_destroy(&state_ptr->backend);
     }
 }
 
 void renderer_on_resize(u16 width, u16 height) {
-    if (backend) {
-        backend->resized(backend, width, height);
+    if (state_ptr && state_ptr->initialized) {
+        // change aspect ratio
+        state_ptr->projection = mat4_perspective(
+            deg_to_rad(45.0f),
+            width / (f32)height,
+            state_ptr->near_clip,
+            state_ptr->far_clip);
+        state_ptr->backend.resized(&state_ptr->backend, width, height);
     } else {
         LOG_WARN("Renderer backend not initialized. Skipping resize...");
     }
 }
 
 b8 renderer_begin_frame(f32 delta_time) {
-    return backend->begin_frame(backend, delta_time);
+    if (state_ptr && state_ptr->initialized) {
+        return state_ptr->backend.begin_frame(&state_ptr->backend, delta_time);
+    }
+    return false;
 }
 
 b8 renderer_end_frame(f32 delta_time) {
-    b8 result = backend->end_frame(backend, delta_time);
-    backend->frame_number++;
-    return result;
+    if (state_ptr && state_ptr->initialized) {
+        b8 result = state_ptr->backend.end_frame(&state_ptr->backend, delta_time);
+        state_ptr->backend.frame_number++;
+        return result;
+    }
+    return false;
 }
 
 b8 renderer_draw_frame(render_packet* packet) {
-    //LOG_TRACE("Drawing frame %d", backend->frame_number);
+    //LOG_TRACE("Drawing frame %d", state_ptr->backend.frame_number);
     if (renderer_begin_frame(packet->delta_time)) {
+        state_ptr->backend.update_global_state(state_ptr->projection, state_ptr->view, vec3_zero(), vec4_one(), 0);
+
+        quat rotation = quat_from_axis_angle(vec3_forward(), -0.01f * state_ptr->backend.frame_number, false);
+        mat4 model = quat_to_rotation_matrix(rotation, vec3_zero());
+        state_ptr->backend.update_object(model);
+
         b8 result = renderer_end_frame(packet->delta_time);
         if (!result) {
             LOG_FATAL("Failed to end frame. Shutting down...");

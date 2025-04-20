@@ -6,8 +6,8 @@
 b8 create_application(app* application_inst) {
     application_inst->config.start_pos_x = 100;
     application_inst->config.start_pos_y = 100;
-    application_inst->config.window_width = 800;
-    application_inst->config.window_height = 600;
+    application_inst->config.window_width = 1600;
+    application_inst->config.window_height = 1000;
     application_inst->config.window_title = "testy";
 
     application_inst->initialize = game_initialize;

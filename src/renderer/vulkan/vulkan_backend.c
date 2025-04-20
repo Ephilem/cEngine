@@ -41,6 +41,21 @@ void create_command_buffers(renderer_backend* backend);
 void regenerate_framebuffers(renderer_backend* backend, vulkan_swapchain* swapchain, vulkan_renderpass* renderpass);
 b8 recreate_swapchain(renderer_backend* backend);
 
+
+// TEMP METHOD
+void upload_data_range(vulkan_context* context, VkCommandPool pool, VkFence fence, VkQueue queue, vulkan_buffer* buffer, u64 offset, u64 size, void* data) {
+    VkBufferUsageFlags flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    // Because we cant write directly to the buffer (VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT), we need to create a staging buffer
+    vulkan_buffer staging;
+    vulkan_buffer_create(context, size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, flags, true, &staging);
+
+    vulkan_buffer_load_data(context, &staging, 0, size, 0, data);
+
+    vulkan_buffer_copy_to(context, pool, fence, queue, staging.handle, 0, buffer->handle, offset, size);
+
+    vulkan_buffer_destroy(context, &staging);
+}
+
 b8 vulkan_renderer_backend_initialize(struct renderer_backend *backend, const char *application_name, struct platform_state *platform_state) {
     // TODO use platform allocator with the tag MEMORY_TAG_VULKAN
     context.allocator = 0;
@@ -191,6 +206,33 @@ b8 vulkan_renderer_backend_initialize(struct renderer_backend *backend, const ch
 
     create_buffers(&context);
 
+
+    // TODO: temp test code - manually create a triangle
+    const u32 vert_count = 4;
+    vertex_3d verts[4];
+    czero_memory(verts, sizeof(vertex_3d) * vert_count);
+
+    const f32 f = 10.0f;
+
+    verts[0].position.x = -0.5f * f;
+    verts[0].position.y = -0.5f * f;
+
+    verts[1].position.x = 0.5f * f;
+    verts[1].position.y = 0.5f * f;
+
+    verts[2].position.x = -0.5f * f;
+    verts[2].position.y = 0.5f * f;
+
+    verts[3].position.x = 0.5f * f;
+    verts[3].position.y = -0.5f * f;
+
+    const u32 index_count = 6;
+    u32 indices[6] = {0, 1, 2, 0, 3, 1};
+
+    upload_data_range(&context, context.device.graphics_command_pool, 0, context.device.graphics_queue, &context.object_vertex_buffer, 0, sizeof(vertex_3d) * vert_count, verts);
+    upload_data_range(&context, context.device.graphics_command_pool, 0, context.device.graphics_queue, &context.object_index_buffer, 0, sizeof(u32) * index_count, indices);
+    // end test code
+
     LOG_INFO("Vulkan renderer backend initialized");
     return true;
 }
@@ -338,6 +380,11 @@ b8 vulkan_renderer_backend_begin_frame(struct renderer_backend *backend, f32 del
 
     // begin recording commands
     vulkan_command_buffer* command_buffer = &context.graphics_command_buffers[context.image_index];
+
+    if (context.images_in_flight[context.image_index]) {
+        vulkan_fence_wait(&context, context.images_in_flight[context.image_index], UINT64_MAX);
+    }
+
     vulkan_command_buffer_reset(command_buffer);
     vulkan_command_buffer_begin_recording(command_buffer, false, false, false);
 
@@ -364,7 +411,26 @@ b8 vulkan_renderer_backend_begin_frame(struct renderer_backend *backend, f32 del
     //LOG_TRACE("Begin render pass on frame buffer %p (with image view %p)", &context.swapchain.framebuffers[context.image_index], context.swapchain.views[context.image_index]);
     vulkan_renderpass_begin(command_buffer, &context.main_renderpass, context.swapchain.framebuffers[context.image_index].handle);
 
+
     return true;
+}
+
+void vulkan_renderer_update_global_state(mat4 projection, mat4 view, vec3 view_position, vec4 ambient_colour, i32 mode) {
+    vulkan_command_buffer* command_buffer = &context.graphics_command_buffers[context.image_index];
+    vulkan_object_shader_use(&context, &context.object_shader);
+
+    // copy parameters so we sure that the data is immutable (no pointer
+    context.object_shader.global_ubo.projection = projection;
+    context.object_shader.global_ubo.view = view;
+
+    // todo : other ubo property
+
+    vulkan_object_shader_update_global_state(&context, &context.object_shader);
+
+    // mark all ubo as need to be updated
+    for (u32 i = 0; i < context.swapchain.image_count; ++i) {
+        context.object_shader.global_descriptor_updated[i] = false;
+    }
 }
 
 b8 vulkan_renderer_backend_end_frame(struct renderer_backend *backend, f32 delta_time) {
@@ -428,6 +494,21 @@ b8 vulkan_renderer_backend_end_frame(struct renderer_backend *backend, f32 delta
     return true;
 }
 
+void vulkan_backend_update_object(mat4 model) {
+    vulkan_command_buffer* command_buffer = &context.graphics_command_buffers[context.image_index];
+    vulkan_object_shader_update_object(&context, &context.object_shader, model);
+
+
+    // TODO:  temp code - draw using the object shader
+    vulkan_object_shader_use(&context, &context.object_shader);
+
+    VkDeviceSize offsets[1] = {0}; // rendering at the beginning of the buffer
+    vkCmdBindVertexBuffers(command_buffer->handle, 0, 1, &context.object_vertex_buffer.handle, (VkDeviceSize*)offsets);
+
+    vkCmdBindIndexBuffer(command_buffer->handle, context.object_index_buffer.handle, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(command_buffer->handle, 6, 1, 0, 0, 0);
+    // end test code
+}
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
@@ -574,7 +655,7 @@ b8 recreate_swapchain(renderer_backend *backend) {
 }
 
 b8 create_buffers(vulkan_context* context) {
-    VkMemoryPropertyFlagBits memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    VkMemoryPropertyFlagBits memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT; // because its local only, this memory is faster
 
     // vertex buffer
     const u64 vertex_buffer_size = sizeof(vertex_3d) * 1024 * 1024;
