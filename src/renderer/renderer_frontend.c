@@ -6,6 +6,13 @@
 #include "core/cmemory.h"
 #include "math/cmath.h"
 
+#include "resources/resource_types.h"
+
+// TODO temp
+#include "core/event.h"
+#include "systems/texture_system.h"
+// End temp
+
 typedef struct renderer_system_state {
     b8 initialized;
     renderer_backend backend;
@@ -15,19 +22,46 @@ typedef struct renderer_system_state {
     f32 far_clip;
 
     mat4 view;
+
+    texture* test_diffuse;
 } renderer_system_state;
 
 static renderer_system_state* state_ptr;
+
+
+b8 event_on_debug_event(u16 code, void* sender, void* listener_inst, event_context data) {
+    const char* names[3] = {
+        "cobblestone",
+        "clay",
+        "bookshelf"
+    };
+    static i8 choice = 2;
+    const char* old_name = names[choice];
+
+    choice++;
+    choice %= 3;
+
+    // load up the new texture
+    state_ptr->test_diffuse = texture_system_acquire(names[choice], true);
+
+    texture_system_release(old_name);
+
+    return true;
+}
+
+// END temp functions
 
 b8 initialize_renderer(u64* memory_requirement, void* state) {
     *memory_requirement = sizeof(renderer_system_state);
     if (state == 0) {
         return false;
     }
-
     state_ptr = state;
     czero_memory(state_ptr, sizeof(renderer_system_state));
     state_ptr->initialized = true;
+
+    // TODO temp register
+    event_register(EVENT_CODE_DEBUG0, state_ptr, event_on_debug_event);
 
     return true;
 }
@@ -73,6 +107,8 @@ void renderer_set_view(mat4 view) {
 
 void renderer_shutdown() {
     if (state_ptr) {
+        // TODO temp unregister
+        event_unregister(EVENT_CODE_DEBUG0, state_ptr, event_on_debug_event);
         state_ptr->backend.shutdown(&state_ptr->backend);
         renderer_backend_destroy(&state_ptr->backend);
     }
@@ -113,9 +149,17 @@ b8 renderer_draw_frame(render_packet* packet) {
     if (renderer_begin_frame(packet->delta_time)) {
         state_ptr->backend.update_global_state(state_ptr->projection, state_ptr->view, vec3_zero(), vec4_one(), 0);
 
-        quat rotation = quat_from_axis_angle(vec3_forward(), -0.01f * state_ptr->backend.frame_number, false);
-        mat4 model = quat_to_rotation_matrix(rotation, vec3_zero());
-        state_ptr->backend.update_object(model);
+        mat4 model = mat4_translation((vec3){0, 0, 0});
+        geometry_render_data data = {};
+        data.object_id = 0;
+        data.model = model;
+
+        if (!state_ptr->test_diffuse) {
+            state_ptr->test_diffuse = texture_system_get_default_texture();
+        }
+
+        data.textures[0] = state_ptr->test_diffuse;
+        state_ptr->backend.update_object(data);
 
         b8 result = renderer_end_frame(packet->delta_time);
         if (!result) {
@@ -127,4 +171,27 @@ b8 renderer_draw_frame(render_packet* packet) {
     }
 
     return true;
+}
+
+void renderer_create_texture(
+    const char* name,
+    i32 width,
+    i32 height,
+    i32 channel_count,
+    const u8* pixels,
+    b8 has_transparency,
+    struct texture* out_texture) {
+    if (state_ptr && state_ptr->initialized) {
+        state_ptr->backend.create_texture(name, width, height, channel_count, pixels, has_transparency, out_texture);
+    } else {
+        LOG_WARN("Renderer backend not initialized. Skipping texture creation...");
+    }
+}
+
+void renderer_destroy_texture(struct texture* texture) {
+    if (state_ptr && state_ptr->initialized) {
+        state_ptr->backend.destroy_texture(texture);
+    } else {
+        LOG_WARN("Renderer backend not initialized. Skipping texture destruction...");
+    }
 }

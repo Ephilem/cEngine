@@ -211,6 +211,17 @@ b8 select_physical_device(vulkan_context *context) {
         VkPhysicalDeviceMemoryProperties memory;
         vkGetPhysicalDeviceMemoryProperties(physical_devices[i], &memory);
 
+        // check if device supports local/host visible combo
+        b8 supports_device_local_host_visible = false;
+        for (u32 j = 0; j < memory.memoryTypeCount; ++j) {
+            if (
+                ((memory.memoryTypes[j].propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0) &&
+                ((memory.memoryTypes[j].propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) != 0)) {
+                supports_device_local_host_visible = true;
+                break;
+            }
+        }
+
         vulkan_physical_device_requirements requirements = {
             .graphics = true,
             .present = true,
@@ -287,6 +298,7 @@ b8 select_physical_device(vulkan_context *context) {
             context->device.properties = properties;
             context->device.features = features;
             context->device.memory = memory;
+            context->device.supports_device_local_host_visible = supports_device_local_host_visible;
             break;
         }
     }

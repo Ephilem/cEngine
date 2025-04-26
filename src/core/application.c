@@ -10,6 +10,7 @@
 #include "memory/linear_allocator.h"
 
 #include "renderer/renderer_frontend.h"
+#include "systems/texture_system.h"
 
 enum application_state_enum {
     APPLICATION_STATE_STARTING = 0,
@@ -49,6 +50,9 @@ typedef struct application_state {
 
     u64 renderer_system_memory_requirement;
     void* renderer_system_state;
+
+    u64 texture_system_memory_requirement;
+    void* texture_system_state;
 } application_state;
 
 static b8 initialized = false;
@@ -70,7 +74,7 @@ b8 application_create(app* app_inst) {
     app_state->app_inst = app_inst;
     app_state->state = APPLICATION_STATE_STARTING;
 
-    u64 systems_allocator_total_size = 1024 * 1024 * 2; // Réduit à 2 MB au lieu de 10 MB
+    u64 systems_allocator_total_size = 1024 * 1024 * 4; // Réduit à 2 MB au lieu de 10 MB
     linear_allocator_create(systems_allocator_total_size, 0, &app_state->systems_allocator);
     
     // Vérifions si l'allocateur a été correctement initialisé
@@ -136,11 +140,6 @@ b8 application_create(app* app_inst) {
         return false;
     }
 
-    event_register(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
-    event_register(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
-    event_register(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
-    event_register(EVENT_CODE_WINDOW_RESIZE, 0, application_on_window_resize);
-
 
     // Configurer les informations de la fenêtre
     app_state->platform_state.window_title = app_inst->config.window_title;
@@ -148,7 +147,7 @@ b8 application_create(app* app_inst) {
     app_state->platform_state.y = app_inst->config.start_pos_y;
     app_state->platform_state.width = app_inst->config.window_width;
     app_state->platform_state.height = app_inst->config.window_height;
-    
+
     // Créer la fenêtre
     if (!create_window(&app_state->platform_state)) {
         LOG_ERROR("Platform failed to create window!");
@@ -159,6 +158,21 @@ b8 application_create(app* app_inst) {
         LOG_FATAL("Failed to initialize renderer! Shutting down.");
         return false;
     }
+
+    // Texture system
+    texture_system_config texture_sys_config;
+    texture_sys_config.max_texture_count = 65536;
+    texture_system_initialize(&app_state->texture_system_memory_requirement, 0, &texture_sys_config);
+    app_state->texture_system_state = linear_allocator_allocate(&app_state->systems_allocator, app_state->texture_system_memory_requirement);
+    if (!texture_system_initialize(&app_state->texture_system_memory_requirement, app_state->texture_system_state, &texture_sys_config)) {
+        LOG_FATAL("Failed to initialize texture system! Shutting down.");
+        return false;
+    }
+
+    event_register(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
+    event_register(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
+    event_register(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
+    event_register(EVENT_CODE_WINDOW_RESIZE, 0, application_on_window_resize);
 
     if (!app_state->app_inst->initialize(app_inst)) {
         LOG_FATAL("Application failed to initialize! Shutting down.");
@@ -232,7 +246,18 @@ b8 application_run() {
 
     app_state->state = APPLICATION_STATE_SHUTDOWN;
 
-    event_shutdown();
+    event_unregister(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
+    event_unregister(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
+    event_unregister(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
+
+    if (app_state->event_system_state) {
+        event_shutdown();
+    }
+
+    if (app_state->texture_system_state) {
+        texture_system_shutdown();
+    }
+
     // Vérifier si le système d'input a été correctement initialisé avant de le fermer
     if (app_state->input_system_state) {
         shutdown_input();

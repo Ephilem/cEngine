@@ -3,13 +3,20 @@ project(cEngine C)
 
 set(CMAKE_C_STANDARD 11)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=vla") # force C11 and prevent using VLA
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror=vla") # force C11 and prevent using VLA
 
 find_program(GLSL_COMPILER glslc)
 
 if(NOT GLSL_COMPILER)
     message(FATAL_ERROR "glslc not found!")
 endif()
+
+set(ASSETS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/assets")
+set(ASSETS_OUTPUT_DIR "${CMAKE_BINARY_DIR}/assets")
+
+file(MAKE_DIRECTORY ${ASSETS_OUTPUT_DIR})
+file(MAKE_DIRECTORY ${ASSETS_OUTPUT_DIR}/shaders)
+file(MAKE_DIRECTORY ${ASSETS_OUTPUT_DIR}/textures)
 
 find_package(Vulkan REQUIRED)
 find_package(PkgConfig REQUIRED)
@@ -68,8 +75,8 @@ add_library(cEngine
         src/math/cmath.c
         src/memory/linear_allocator.h
         src/memory/linear_allocator.c
-        src/renderer/vulkan/shaders/vulkan_object_shader.h
-        src/renderer/vulkan/shaders/vulkan_object_shader.c
+        src/renderer/vulkan/shaders/vulkan_material_shader.h
+        src/renderer/vulkan/shaders/vulkan_material_shader.c
         src/renderer/vulkan/vulkan_shader_utils.c
         src/renderer/vulkan/vulkan_shader_utils.h
         src/platform/filesystem.c
@@ -77,7 +84,12 @@ add_library(cEngine
         src/renderer/vulkan/vulkan_pipeline.c
         src/renderer/vulkan/vulkan_pipeline.h
         src/renderer/vulkan/vulkan_buffer.c
-        src/renderer/vulkan/vulkan_buffer.h)
+        src/renderer/vulkan/vulkan_buffer.h
+        src/resources/resource_types.h
+        src/containers/hashtable.c
+        src/containers/hashtable.h
+        src/systems/texture_system.c
+        src/systems/texture_system.h)
 
 target_include_directories(
         cEngine
@@ -94,9 +106,7 @@ target_link_libraries(cEngine PRIVATE
 
 function(compile_shader TARGET SHADER)
     get_filename_component(SHADER_NAME ${SHADER} NAME)
-    set(SHADER_OUTPUT "${CMAKE_BINARY_DIR}/shaders/${SHADER_NAME}.spv")
-
-    file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/shaders)
+    set(SHADER_OUTPUT "${ASSETS_OUTPUT_DIR}/shaders/${SHADER_NAME}.spv")
 
     add_custom_command(
             OUTPUT ${SHADER_OUTPUT}
@@ -111,7 +121,11 @@ function(compile_shader TARGET SHADER)
     )
 endfunction()
 
-file(GLOB SHADER_SOURCES "src/shaders/*.vert" "src/shaders/*.frag" "src/shaders/*.comp")
+# Make sure to reconfigure when shader files change
+file(GLOB_RECURSE SHADER_SOURCES_FOR_RECONFIGURE "${ASSETS_SOURCE_DIR}/shaders/*.vert" "${ASSETS_SOURCE_DIR}/shaders/*.frag" "${ASSETS_SOURCE_DIR}/shaders/*.comp")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${SHADER_SOURCES_FOR_RECONFIGURE})
+
+file(GLOB SHADER_SOURCES "${ASSETS_SOURCE_DIR}/shaders/*.vert" "${ASSETS_SOURCE_DIR}/shaders/*.frag" "${ASSETS_SOURCE_DIR}/shaders/*.comp")
 
 foreach(SHADER ${SHADER_SOURCES})
     compile_shader(cEngine ${SHADER})
@@ -126,5 +140,22 @@ else()
     add_dependencies(cEngine Shaders)
 endif()
 
+add_custom_target(CopyTextures ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${ASSETS_SOURCE_DIR}/textures
+    ${ASSETS_OUTPUT_DIR}/textures
+    COMMENT "Copying textures to build assets directory"
+)
+
+add_dependencies(cEngine CopyTextures)
+
 add_subdirectory(example)
 add_subdirectory(tests)
+
+add_custom_command(
+    TARGET Shaders POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${ASSETS_OUTPUT_DIR}/shaders
+    ${ASSETS_SOURCE_DIR}/shaders
+    COMMENT "Updating compiled shaders in source assets directory"
+)

@@ -9,13 +9,16 @@ b8 renderer_backend_create(renderer_backend_type type, struct platform_state* pl
     switch (type) {
         case RENDERER_BACKEND_VULKAN: {
             LOG_INFO("Renderer backend: Vulkan");
-            out_backend->initialize = vulkan_renderer_backend_initialize;
-            out_backend->shutdown = vulkan_renderer_backend_shutdown;
-            out_backend->begin_frame = vulkan_renderer_backend_begin_frame;
-            out_backend->update_global_state = vulkan_renderer_update_global_state;
-            out_backend->end_frame = vulkan_renderer_backend_end_frame;
-            out_backend->resized = vulkan_renderer_backend_resized;
+            out_backend->initialize = vulkan_backend_initialize;
+            out_backend->shutdown = vulkan_backend_shutdown;
+            out_backend->begin_frame = vulkan_backend_begin_frame;
+            out_backend->update_global_state = vulkan_backend_update_global_state;
+            out_backend->end_frame = vulkan_backend_end_frame;
+            out_backend->resized = vulkan_backend_resized;
             out_backend->update_object = vulkan_backend_update_object;
+
+            out_backend->create_texture = vulkan_backend_create_texture;
+            out_backend->destroy_texture = vulkan_backend_destroy_texture;
         } break;
         /*case RENDERER_BACKEND_OPENGL: {
             return renderer_backend_opengl_create(platform_state, out_backend);

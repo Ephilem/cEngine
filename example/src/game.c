@@ -6,6 +6,8 @@
 #include <math/cmath.h>
 #include <renderer/renderer_frontend.h>
 
+#include "core/event.h"
+
 
 static u64 alloc_count = 0;
 
@@ -56,6 +58,11 @@ b8 game_update(app* application_inst, f32 delta_time) {
     alloc_count = get_memory_alloc_count();
     if (input_is_key_down('M') && input_was_key_up('M')) {
         LOG_DEBUG("Allocations: %llu (%llu this frame)", alloc_count, alloc_count - prev_alloc_count);
+    }
+
+    if (input_is_key_down('T') && input_was_key_up('T')) {
+        event_context context = {};
+        event_fire(EVENT_CODE_DEBUG0, application_inst, context);
     }
 
     if (input_is_key_down('Q')) {

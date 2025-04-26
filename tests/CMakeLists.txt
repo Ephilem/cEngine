@@ -11,6 +11,8 @@ add_executable(cEngine_tests
         src/test_manager.c
         src/memory/linear_allocator_tests.c
         src/memory/linear_allocator_tests.h
+        src/containers/hashtable_tests.c
+        src/containers/hashtable_tests.h
 )
 
 

@@ -84,6 +84,77 @@ void vulkan_image_view_create(
     VK_CHECK(vkCreateImageView(context->device.logical, &view_create_info, context->allocator, &image->view));
 }
 
+void vulkan_image_transition_layout(vulkan_context *context, vulkan_command_buffer *command_buffer, vulkan_image *image, VkFormat format, VkImageLayout old_layout, VkImageLayout new_layout) {
+    // sync point that assure that operation that use this barrier complete before executing the next command (because execution
+    // order is not guaranteed and made by the driver)
+    VkImageMemoryBarrier barrier = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+    barrier.oldLayout = old_layout;
+    barrier.newLayout = new_layout;
+    barrier.srcQueueFamilyIndex = context->device.graphics_queue_index;
+    barrier.dstQueueFamilyIndex = context->device.graphics_queue_index;
+    barrier.image = image->handle;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // is color image
+    barrier.subresourceRange.baseMipLevel = 0; // no mipmapping
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags src_stage;
+    VkPipelineStageFlags dst_stage;
+
+    // if dont care about the old layout - transition to optimal layout (for the underlying implementation)
+    if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        // Dont care what stage the pipeline is in at the start
+        src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+        // used for copying
+        dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    // Transition from transfer dst to shader read (prepare for shader to use the image)
+    } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        // used for copying
+        src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+
+        // used for sampling
+        dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else {
+        LOG_FATAL("Unsupported image layout transition from %d to %d", old_layout, new_layout);
+        return;
+    }
+
+    vkCmdPipelineBarrier(
+        command_buffer->handle,
+        src_stage, dst_stage,
+        0,
+        0, 0,
+        0, 0,
+        1, &barrier);
+}
+
+void vulkan_image_copy_from_buffer(vulkan_context *context, vulkan_image *image, VkBuffer buffer, vulkan_command_buffer *command_buffer) {
+    VkBufferImageCopy region;
+    czero_memory(&region, sizeof(VkBufferImageCopy));
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT; // is color image
+    region.imageSubresource.mipLevel = 0; // no mipmapping
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+
+    region.imageExtent.width = image->width;
+    region.imageExtent.height = image->height;
+    region.imageExtent.depth = 1; // no 3d images
+
+    vkCmdCopyBufferToImage(command_buffer->handle, buffer, image->handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+}
+
 void vulkan_image_destroy(vulkan_context* context, vulkan_image* image) {
     if (image->view) {
         vkDestroyImageView(context->device.logical, image->view, context->allocator);

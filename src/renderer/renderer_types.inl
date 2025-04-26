@@ -3,6 +3,7 @@
 
 #include "define.h"
 #include "math/math_types.h"
+#include "resources/resource_types.h"
 
 typedef enum renderer_backend_type {
     RENDERER_BACKEND_VULKAN,
@@ -19,6 +20,21 @@ typedef struct global_uniform_object {
     mat4 m_reserved0; // 64 bytes
     mat4 m_reserved1; // 64 bytes
 } global_uniform_object; // = 256 bytes
+
+typedef struct object_uniform_object {
+    vec4 diffuse_color; // 16 bytes
+
+    vec4 v_reserved0; // 16 bytes
+    vec4 v_reserved1; // 16 bytes
+    vec4 v_reserved2; // 16 bytes
+} object_uniform_object; // = 64 bytes
+
+// pass to the renderer inform to how to render specific object
+typedef struct geometry_render_data {
+    u32 object_id;
+    mat4 model;
+    texture* textures[16];
+} geometry_render_data;
 
 // interface for a renderer backend
 typedef struct renderer_backend {
@@ -37,7 +53,17 @@ typedef struct renderer_backend {
     // Submit the frame to be rendered
     b8 (*end_frame)(struct renderer_backend* backend, f32 delta_time);
 
-    void (*update_object)(mat4 model);
+    void (*update_object)(geometry_render_data data);
+
+    void (*create_texture)(
+        const char* name,
+        i32 width,
+        i32 height,
+        i32 channel_count,
+        const u8* pixels,
+        b8 has_transparency,
+        struct texture* out_texture);
+    void (*destroy_texture)(struct texture* texture);
 
 } renderer_backend;
 

@@ -14,14 +14,9 @@ b8 create_shader_module(vulkan_context *context, const char *shader_name, const 
     VkShaderStageFlagBits shader_stage_flag, u32 stage_index, vulkan_shader_stage *shader_stages) {
 
     // Build file name :
-    char file_name[1024];
     // TODO: use a resource system instead of the hack of ../ to get the cEngine buildin compiled shaders folder
-    char relative_path[1024];
-    string_format(relative_path, "../%s/%s.%s.spv", SHADERS_PATH, shader_name, stage_type_str);
-
-    char executable_dir[1024];
-    filesystem_get_executable_dir(executable_dir);
-    string_format(file_name, "%s/%s", executable_dir, relative_path);
+    char file_name[1024];
+    string_format(file_name, "./assets/shaders/%s.%s.spv", shader_name, stage_type_str);
 
     LOG_DEBUG("Loading shader from: %s", file_name);
     LOG_DEBUG("Shader file exists: %s", filesystem_exists(file_name) ? "YES" : "NO");
@@ -48,6 +43,7 @@ b8 create_shader_module(vulkan_context *context, const char *shader_name, const 
     }
     shader_stages[stage_index].create_info.codeSize = file_size;
     shader_stages[stage_index].create_info.pCode = (u32*)file_buffer;
+    LOG_DEBUG("File size is %llu bytes", file_size);
 
     filesystem_close(&handle);
 

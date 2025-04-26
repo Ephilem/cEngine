@@ -20,6 +20,14 @@ b8 string_equals(const char* a, const char* b) {
     return strcmp(a, b) == 0;
 }
 
+b8 string_equals_case(const char *a, const char *b) {
+#if defined(__GNUC__)
+    return strcasecmp(a, b) == 0;
+#elif defined(_MSC_VER)
+    return _strcmpi(a, b) == 0;
+#endif
+}
+
 i32 string_format(char* dest, const char* format, ...) {
     if (dest) {
         __builtin_va_list arg_ptr;

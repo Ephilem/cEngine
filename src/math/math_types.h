@@ -68,6 +68,6 @@ typedef union mat4_u {
 
 typedef struct vertex_3d {
     vec3 position;
+    vec2 texcoord;
     //vec3 normal;
-    //vec2 uv;
 } vertex_3d;

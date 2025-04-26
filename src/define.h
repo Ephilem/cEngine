@@ -43,9 +43,11 @@ typedef _Bool b8;
 // STATIC_ASSERT(sizeof(f32) == 4, "Expected f32 to be 4 bytes.");
 // STATIC_ASSERT(sizeof(f64) == 8, "Expected f64 to be 8 bytes.");
 
-
 #define true 1
 #define false 0
+
+#define INVALID_ID 4294967295U // 0xFFFFFFFF
+
 
 // Platform detection
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32__)
@@ -110,3 +112,4 @@ typedef _Bool b8;
 #define cINLINE static inline
 #define cNOINLINE __attribute__((noinline))
 #endif
+

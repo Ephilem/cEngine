@@ -1,11 +1,13 @@
 #include "vulkan_command_buffer.h"
 
+#include "vulkan_utils.h"
 #include "core/cmemory.h"
+#include "core/logger.h"
 
 void vulkan_command_buffer_allocate_from_pool(vulkan_context *context, VkCommandPool pool, b8 is_primary,
-    vulkan_command_buffer *out_command_buffer) {
+                                              vulkan_command_buffer *out_command_buffer) {
 
-    czero_memory(out_command_buffer, sizeof(vulkan_command_buffer));
+    czero_memory(out_command_buffer, sizeof(out_command_buffer));
 
     VkCommandBufferAllocateInfo allocate_info = {VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
     allocate_info.commandPool = pool;
@@ -18,8 +20,7 @@ void vulkan_command_buffer_allocate_from_pool(vulkan_context *context, VkCommand
     out_command_buffer->state = COMMAND_BUFFER_STATE_READY;
 }
 
-void vulkan_command_buffer_free_from_pool(vulkan_context *context, VkCommandPool pool,
-    vulkan_command_buffer *command_buffer) {
+void vulkan_command_buffer_free_from_pool(vulkan_context *context, VkCommandPool pool, vulkan_command_buffer *command_buffer) {
     vkFreeCommandBuffers(context->device.logical, pool, 1, &command_buffer->handle);
     command_buffer->handle = 0;
     command_buffer->state = COMMAND_BUFFER_STATE_NOT_ALLOCATED;

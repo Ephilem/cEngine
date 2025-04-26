@@ -5,6 +5,8 @@
 #include <core/cstring.h>
 #include <core/clock.h>
 
+#include "memory/linear_allocator.h"
+
 typedef struct test_entry {
     PFN_test func;
     char* desc;
@@ -12,7 +14,19 @@ typedef struct test_entry {
 
 static test_entry* tests;
 
+static linear_allocator systems_allocator;
+static u64 logging_system_memory_requirement;
+static void* logging_system_state;
+
 void test_manager_init() {
+    linear_allocator_create(1024 *  1024, 0, &systems_allocator);
+
+    initialize_logging(&logging_system_memory_requirement, 0);
+    logging_system_state = linear_allocator_allocate(&systems_allocator, logging_system_memory_requirement);
+    if (!initialize_logging(&logging_system_memory_requirement, logging_system_state)) {
+        LOG_FATAL("Failed to initialize logging system! Shutting down.");
+        return;
+    }
     tests = darray_create(test_entry);
 }
 

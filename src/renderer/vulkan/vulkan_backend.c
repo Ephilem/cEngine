@@ -8,6 +8,7 @@
 #include "vulkan_command_buffer.h"
 #include "vulkan_framebuffer.h"
 #include "vulkan_fence.h"
+#include "vulkan_image.h"
 #include "vulkan_utils.h"
 #include "vulkan_types.inl"
 
@@ -21,7 +22,7 @@
 
 #include "platform/platform.h"
 
-#include "shaders/vulkan_object_shader.h"
+#include "shaders/vulkan_material_shader.h"
 
 // static vulkan context
 static vulkan_context context;
@@ -56,7 +57,7 @@ void upload_data_range(vulkan_context* context, VkCommandPool pool, VkFence fenc
     vulkan_buffer_destroy(context, &staging);
 }
 
-b8 vulkan_renderer_backend_initialize(struct renderer_backend *backend, const char *application_name, struct platform_state *platform_state) {
+b8 vulkan_backend_initialize(struct renderer_backend *backend, const char *application_name, struct platform_state *platform_state) {
     // TODO use platform allocator with the tag MEMORY_TAG_VULKAN
     context.allocator = 0;
     context.find_memory_index = find_memory_index;
@@ -199,7 +200,7 @@ b8 vulkan_renderer_backend_initialize(struct renderer_backend *backend, const ch
     }
 
     // create builtin shaders
-    if (!vulkan_object_shader_create(&context, &context.object_shader)) {
+    if (!vulkan_material_shader_create(&context, &context.material_shader)) {
         LOG_ERROR("Failed to create the vulkan object shader");
         return false;
     }
@@ -216,35 +217,51 @@ b8 vulkan_renderer_backend_initialize(struct renderer_backend *backend, const ch
 
     verts[0].position.x = -0.5f * f;
     verts[0].position.y = -0.5f * f;
+    verts[0].texcoord.u = 0.0f;
+    verts[0].texcoord.v = 0.0f;
 
     verts[1].position.x = 0.5f * f;
     verts[1].position.y = 0.5f * f;
+    verts[1].texcoord.u = 1.0f;
+    verts[1].texcoord.v = 1.0f;
 
     verts[2].position.x = -0.5f * f;
     verts[2].position.y = 0.5f * f;
+    verts[2].texcoord.u = 0.0f;
+    verts[2].texcoord.v = 1.0f;
 
     verts[3].position.x = 0.5f * f;
     verts[3].position.y = -0.5f * f;
+    verts[3].texcoord.u = 1.0f;
+    verts[3].texcoord.v = 0.0f;
 
     const u32 index_count = 6;
     u32 indices[6] = {0, 1, 2, 0, 3, 1};
 
     upload_data_range(&context, context.device.graphics_command_pool, 0, context.device.graphics_queue, &context.object_vertex_buffer, 0, sizeof(vertex_3d) * vert_count, verts);
     upload_data_range(&context, context.device.graphics_command_pool, 0, context.device.graphics_queue, &context.object_index_buffer, 0, sizeof(u32) * index_count, indices);
+
+    // Once data loaded into the gpu, we need to aquire resources for the test object id object_id. So we have an handle to the
+    // descriptor to set a texture for example
+    u32 object_id = 0;
+    if (!vulkan_material_shader_acquire_resources(&context, &context.material_shader, &object_id)) {
+        LOG_ERROR("Failed to acquire resources for the object shader");
+        return false;
+    }
     // end test code
 
     LOG_INFO("Vulkan renderer backend initialized");
     return true;
 }
 
-void vulkan_renderer_backend_shutdown(struct renderer_backend *backend) {
+void vulkan_backend_shutdown(struct renderer_backend *backend) {
     vkDeviceWaitIdle(context.device.logical);
 
     // destroy buffers
     vulkan_buffer_destroy(&context, &context.object_vertex_buffer);
     vulkan_buffer_destroy(&context, &context.object_index_buffer);
 
-    vulkan_object_shader_destroy(&context, &context.object_shader);
+    vulkan_material_shader_destroy(&context, &context.material_shader);
 
     // Sync objects
     for (u8 i = 0; i < context.swapchain.max_frames_in_flight; ++i) {
@@ -317,7 +334,7 @@ void vulkan_renderer_backend_shutdown(struct renderer_backend *backend) {
     vkDestroyInstance(context.instance, context.allocator);
 }
 
-void vulkan_renderer_backend_resized(struct renderer_backend *backend, u16 width, u16 height) {
+void vulkan_backend_resized(struct renderer_backend *backend, u16 width, u16 height) {
     cached_framebuffer_width = width;
     cached_framebuffer_height = height;
 
@@ -325,8 +342,9 @@ void vulkan_renderer_backend_resized(struct renderer_backend *backend, u16 width
     LOG_DEBUG("Renderer backend called to resize to %dx%d. New generation %d", width, height, context.framebuffer_size_generation);
 }
 
-b8 vulkan_renderer_backend_begin_frame(struct renderer_backend *backend, f32 delta_time) {
+b8 vulkan_backend_begin_frame(struct renderer_backend *backend, f32 delta_time) {
     vulkan_device* device = &context.device;
+    context.frame_delta_time = delta_time;
 
     // Chekc if reacreating swapchain. If so, wait for the device to be idle and boot out
     if (context.recreating_swapchain) {
@@ -415,25 +433,25 @@ b8 vulkan_renderer_backend_begin_frame(struct renderer_backend *backend, f32 del
     return true;
 }
 
-void vulkan_renderer_update_global_state(mat4 projection, mat4 view, vec3 view_position, vec4 ambient_colour, i32 mode) {
+void vulkan_backend_update_global_state(mat4 projection, mat4 view, vec3 view_position, vec4 ambient_colour, i32 mode) {
     vulkan_command_buffer* command_buffer = &context.graphics_command_buffers[context.image_index];
-    vulkan_object_shader_use(&context, &context.object_shader);
+    vulkan_material_shader_use(&context, &context.material_shader);
 
     // copy parameters so we sure that the data is immutable (no pointer
-    context.object_shader.global_ubo.projection = projection;
-    context.object_shader.global_ubo.view = view;
+    context.material_shader.global_ubo.projection = projection;
+    context.material_shader.global_ubo.view = view;
 
     // todo : other ubo property
 
-    vulkan_object_shader_update_global_state(&context, &context.object_shader);
+    vulkan_material_shader_update_global_state(&context, &context.material_shader, context.frame_delta_time);
 
     // mark all ubo as need to be updated
     for (u32 i = 0; i < context.swapchain.image_count; ++i) {
-        context.object_shader.global_descriptor_updated[i] = false;
+        context.material_shader.global_descriptor_updated[i] = false;
     }
 }
 
-b8 vulkan_renderer_backend_end_frame(struct renderer_backend *backend, f32 delta_time) {
+b8 vulkan_backend_end_frame(struct renderer_backend *backend, f32 delta_time) {
     vulkan_command_buffer* command_buffer = &context.graphics_command_buffers[context.image_index];
 
     vulkan_renderpass_end(command_buffer, &context.main_renderpass);
@@ -494,13 +512,13 @@ b8 vulkan_renderer_backend_end_frame(struct renderer_backend *backend, f32 delta
     return true;
 }
 
-void vulkan_backend_update_object(mat4 model) {
+void vulkan_backend_update_object(geometry_render_data data) {
     vulkan_command_buffer* command_buffer = &context.graphics_command_buffers[context.image_index];
-    vulkan_object_shader_update_object(&context, &context.object_shader, model);
+    vulkan_material_shader_update_object(&context, &context.material_shader, data);
 
 
     // TODO:  temp code - draw using the object shader
-    vulkan_object_shader_use(&context, &context.object_shader);
+    vulkan_material_shader_use(&context, &context.material_shader);
 
     VkDeviceSize offsets[1] = {0}; // rendering at the beginning of the buffer
     vkCmdBindVertexBuffers(command_buffer->handle, 0, 1, &context.object_vertex_buffer.handle, (VkDeviceSize*)offsets);
@@ -509,6 +527,8 @@ void vulkan_backend_update_object(mat4 model) {
     vkCmdDrawIndexed(command_buffer->handle, 6, 1, 0, 0, 0);
     // end test code
 }
+
+
 
 VKAPI_ATTR VkBool32 VKAPI_CALL vk_debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
@@ -688,4 +708,114 @@ b8 create_buffers(vulkan_context* context) {
     context->geometry_index_offset = 0;
 
     return true;
+}
+
+void vulkan_backend_create_texture(const char *name, i32 width, i32 height, i32 channel_count, const u8 *pixels, b8 has_transparency, struct texture *out_texture) {
+    out_texture->width = width;
+    out_texture->height = height;
+    out_texture->channel_count = channel_count;
+    out_texture->generation = INVALID_ID;
+
+    // TODO use allocator
+    out_texture->internal_data = (vulkan_texture_data*)callocate(sizeof(vulkan_texture_data), MEMORY_TAG_TEXTURE);
+    vulkan_texture_data* data = (vulkan_texture_data*)out_texture->internal_data;
+    VkDeviceSize image_size = width * height * channel_count;
+
+    // assuming 8 bits per channel
+    VkFormat image_format = VK_FORMAT_R8G8B8A8_UNORM;
+
+    // staging buffer to upload the image - loading data in this buffer
+    VkBufferUsageFlags usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    VkMemoryPropertyFlags memory_prop_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    vulkan_buffer staging;
+    vulkan_buffer_create(&context, image_size, usage, memory_prop_flags, true, &staging);
+    vulkan_buffer_load_data(&context, &staging, 0, image_size, 0, pixels);
+
+    // NOTE : we assure a single type of texture, different texture types will require
+    // different options here (ex 3D textures)
+    vulkan_image_create(
+        &context,
+        VK_IMAGE_TYPE_2D,
+        width, height,
+        image_format,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        true,
+        VK_IMAGE_ASPECT_COLOR_BIT,
+        &data->image);
+
+    // transition the layout from whatevent to optimal for recieving data (for the gpu)
+    vulkan_command_buffer temp_buffer;
+    VkCommandPool pool = context.device.graphics_command_pool;
+    VkQueue queue = context.device.graphics_queue;
+    vulkan_command_buffer_allocate_and_begin_single_use(&context, pool, &temp_buffer);
+    vulkan_image_transition_layout(
+        &context,
+        &temp_buffer,
+        &data->image,
+        image_format,
+        VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+    // copy the data from the buffer
+    vulkan_image_copy_from_buffer(&context, &data->image, staging.handle, &temp_buffer);
+
+    // set the transferred image to the shader read only optimal layout
+    vulkan_image_transition_layout(
+        &context,
+        &temp_buffer,
+        &data->image,
+        image_format,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    vulkan_command_buffer_end_single_use(&context, pool, &temp_buffer, queue);
+
+    vulkan_buffer_destroy(&context, &staging);
+
+    // create the sampler for the texture (used for sampling the texture in the shader, so the shader can use the texture)
+    VkSamplerCreateInfo sampler_create_info = {VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+    // define filter if the image is magnified or minified
+    sampler_create_info.magFilter = VK_FILTER_NEAREST;
+    sampler_create_info.minFilter = VK_FILTER_NEAREST;
+    // repeat the texture if the uv coordinates are outside the texture
+    sampler_create_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_create_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_create_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    // anisotropic filtering improves the quality of the texture when viewed at an angle
+    sampler_create_info.anisotropyEnable = VK_TRUE;
+    sampler_create_info.maxAnisotropy = 16;
+    sampler_create_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    sampler_create_info.unnormalizedCoordinates = VK_FALSE;
+    sampler_create_info.compareEnable = VK_FALSE;
+    sampler_create_info.compareOp = VK_COMPARE_OP_ALWAYS;
+    sampler_create_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_create_info.mipLodBias = 0.0f;
+    sampler_create_info.minLod = 0.0f;
+    sampler_create_info.maxLod = 0.0f;
+
+    VkResult result = vkCreateSampler(context.device.logical, &sampler_create_info, context.allocator, &data->sampler);
+    if (!vulkan_result_is_success(VK_SUCCESS)) {
+        LOG_ERROR("Failed to create the texture sampler: %s", vulkan_result_string(result, true));
+        return;
+    }
+
+    out_texture->has_transparency = has_transparency;
+    out_texture->generation++; // increment the generation of the texture. this is used to check if the texture has been modified (ex anisotropic details changed)
+}
+
+void vulkan_backend_destroy_texture(texture* texture) {
+    vkDeviceWaitIdle(context.device.logical);
+    vulkan_texture_data* data = (vulkan_texture_data*)texture->internal_data;
+
+    if (data) {
+        vulkan_image_destroy(&context, &data->image);
+        czero_memory(&data->image, sizeof(vulkan_image));
+        vkDestroySampler(context.device.logical, data->sampler, context.allocator);
+        data->sampler = 0;
+
+        cfree(texture->internal_data, sizeof(vulkan_texture_data), MEMORY_TAG_TEXTURE);
+        czero_memory(texture, sizeof(struct texture));
+    }
 }

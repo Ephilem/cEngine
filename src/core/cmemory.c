@@ -24,6 +24,7 @@ static const char* memory_tag_strings[MEMORY_TAG_MAX_TAGS] = {
     "JOB             ",
     "RENDERER        ",
     "VULKAN          ",
+    "TEXTURE         ",
 };
 
 typedef struct memory_system_state {
