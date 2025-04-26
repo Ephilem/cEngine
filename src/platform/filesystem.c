@@ -13,8 +13,13 @@
 #include "core/cstring.h"
 
 b8 filesystem_exists(const char *path) {
+#ifdef _MSC_VER
+    struct _stat st;
+    return _stat(path, &st);
+#else
     struct stat st;
     return stat(path, &st) == 0;
+#endif
 }
 
 b8 filesystem_open(const char *path, file_modes mode, b8 binary, file_handle *out_handle) {
@@ -52,14 +57,11 @@ void filesystem_close(file_handle *handle) {
     }
 }
 
-b8 filesystem_read_line(file_handle *handle, char **line_buffer) {
-    if (handle->is_valid) {
-        // we assume a max of 32k char per line
-        char buffer[32000];
-        if (fgets(buffer, 32000, (FILE*)handle->handle) != 0) {
-            u64 length = strlen(buffer);
-            *line_buffer = callocate((sizeof(char) * length) + 1, MEMORY_TAG_STRING);
-            strcpy(*line_buffer, buffer);
+b8 filesystem_read_line(file_handle* handle, u64 max_length, char** line_buf, u64* out_line_length) {
+    if (handle->handle && line_buf && out_line_length && max_length > 0) {
+        char* buf = *line_buf;
+        if (fgets(buf, max_length, (FILE*)handle->handle) != 0) {
+            *out_line_length = strlen(buf);
             return true;
         }
     }

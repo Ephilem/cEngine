@@ -22,6 +22,7 @@ void recalculate_view_matrix(game_state* state) {
 
     state->view = mat4_multiply(rotation, translation);
     state->view = mat4_inverse(state->view);
+
     state->camera_updated = false;
 }
 

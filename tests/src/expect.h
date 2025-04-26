@@ -4,9 +4,12 @@
 #include <math/cmath.h>
 
 #define expect_should_be(expected, actual) \
-    if (actual != expected) { \
-        LOG_ERROR("Expected %s to be %s, but got %s", #actual, #expected, #actual); \
-        return false; \
+    { \
+        typeof(actual) actual_val = (actual); \
+        if (actual_val != expected) { \
+            LOG_ERROR("Expected %s to be %s (%d), but got %d", #actual, #expected, expected, actual_val); \
+            return false; \
+        } \
     }
 
 #define expect_should_not_be(expected, actual) \

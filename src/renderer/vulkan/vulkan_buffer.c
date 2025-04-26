@@ -150,8 +150,7 @@ void vulkan_buffer_load_data(vulkan_context *context, vulkan_buffer *buffer, u64
     vkUnmapMemory(context->device.logical, buffer->memory);
 }
 
-void vulkan_buffer_copy_to(vulkan_context *context, VkCommandPool pool, VkFence fence, VkQueue queue, VkBuffer source,
-    u64 source_offset, VkBuffer dest, u64 dest_offset, u64 size) {
+void vulkan_buffer_copy_to(vulkan_context *context, VkCommandPool pool, VkFence fence, VkQueue queue, VkBuffer source, u64 source_offset, VkBuffer dest, u64 dest_offset, u64 size) {
 
     vkQueueWaitIdle(queue);
 
@@ -160,8 +159,8 @@ void vulkan_buffer_copy_to(vulkan_context *context, VkCommandPool pool, VkFence 
     vulkan_command_buffer_allocate_and_begin_single_use(context, pool, &command_buffer);
 
     VkBufferCopy copy_region;
-    copy_region.srcOffset = 0;
-    copy_region.dstOffset = 0;
+    copy_region.srcOffset = source_offset;
+    copy_region.dstOffset = dest_offset;
     copy_region.size = size;
 
     vkCmdCopyBuffer(command_buffer.handle, source, dest, 1, &copy_region);

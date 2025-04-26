@@ -144,13 +144,30 @@ typedef struct vulkan_descriptor_state {
     u32 ids[4]; // one per frame - used to check if the descriptor set needs to be updated (ex texture change)
 } vulkan_descriptor_state;
 
-#define VULKAN_OBJECT_MAX_OBJECT_COUNT 1024
-#define VULKAN_OBJECT_SHADER_DESCRIPTOR_COUNT 2 // obo + textures
-typedef struct vulkan_object_shader_object_state {
+#define VULKAN_MAX_GEOMETRY_COUNT 4096 // max number of simultaneously uploaded geometries
+
+typedef struct vulkan_geometry_data {
+    u32 id;
+    u32 generation;
+
+    u32 vertex_count;
+    u32 vertex_size;
+    u32 vertex_buffer_offset; // how far in the buffer the vertex data starts
+
+    u32 index_count;
+    u32 index_size;
+    u32 index_buffer_offset; // how far in the buffer the index data starts
+
+} vulkan_geometry_data;
+
+#define VULKAN_MAX_MATERIAL_COUNT 1024
+#define VULKAN_MATERIAL_SHADER_DESCRIPTOR_COUNT 2 // obo + textures
+#define VULKAN_MATERIAL_SHADER_SAMPLER_COUNT 1
+typedef struct vulkan_material_shader_instance_state {
     VkDescriptorSet descriptor_sets[4]; // One descriptor set per frame
 
-    vulkan_descriptor_state descriptor_states[VULKAN_OBJECT_SHADER_DESCRIPTOR_COUNT];
-} vulkan_object_shader_object_state;
+    vulkan_descriptor_state descriptor_states[VULKAN_MATERIAL_SHADER_DESCRIPTOR_COUNT];
+} vulkan_material_shader_instance_state;
 
 #define MATERIAL_SHADER_STAGE_COUNT 2
 typedef struct vulkan_material_shader {
@@ -174,8 +191,10 @@ typedef struct vulkan_material_shader {
     u32 object_uniform_buffer_index; // index of the object uniform buffer in the descriptor set
                                      // increment for each aquisition (so to keep a trace where to write data for an object)
 
+    texture_use sampler_uses[VULKAN_MATERIAL_SHADER_SAMPLER_COUNT];
+
     // TODO make dynamic
-    vulkan_object_shader_object_state object_states[VULKAN_OBJECT_MAX_OBJECT_COUNT]; // one per object
+    vulkan_material_shader_instance_state instance_states[VULKAN_MAX_MATERIAL_COUNT]; // one per instance
 
 } vulkan_material_shader;
 
@@ -208,6 +227,10 @@ typedef struct vulkan_context {
 
     u64 geometry_vertex_offset;
     u64 geometry_index_offset;
+
+    // TODO make this dynamic
+    vulkan_geometry_data geometries[VULKAN_MAX_GEOMETRY_COUNT]; // array of geometries
+    
 
     // darray
     vulkan_command_buffer* graphics_command_buffers; // commands buffer available for the graphics queue (one per frame)

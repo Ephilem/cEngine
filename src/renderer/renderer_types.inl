@@ -21,19 +21,19 @@ typedef struct global_uniform_object {
     mat4 m_reserved1; // 64 bytes
 } global_uniform_object; // = 256 bytes
 
-typedef struct object_uniform_object {
+typedef struct material_uniform_object {
     vec4 diffuse_color; // 16 bytes
 
     vec4 v_reserved0; // 16 bytes
     vec4 v_reserved1; // 16 bytes
     vec4 v_reserved2; // 16 bytes
-} object_uniform_object; // = 64 bytes
+} material_uniform_object; // = 64 bytes
 
 // pass to the renderer inform to how to render specific object
 typedef struct geometry_render_data {
     u32 object_id;
     mat4 model;
-    texture* textures[16];
+    geometry* geometry;
 } geometry_render_data;
 
 // interface for a renderer backend
@@ -53,17 +53,18 @@ typedef struct renderer_backend {
     // Submit the frame to be rendered
     b8 (*end_frame)(struct renderer_backend* backend, f32 delta_time);
 
-    void (*update_object)(geometry_render_data data);
+    void (*draw_geometry)(geometry_render_data data);
 
     void (*create_texture)(
-        const char* name,
-        i32 width,
-        i32 height,
-        i32 channel_count,
         const u8* pixels,
-        b8 has_transparency,
-        struct texture* out_texture);
+        struct texture* texture);
     void (*destroy_texture)(struct texture* texture);
+
+    b8 (*create_material)(struct material* material);
+    void (*destroy_material)(struct material* material);
+
+    b8 (*create_geometry)(geometry* geometry, u32 vertex_count, const vertex_3d* vertices, u32 index_count, const u32* indices);
+    void (*destroy_geometry)(geometry* geometry);
 
 } renderer_backend;
 
@@ -71,5 +72,8 @@ typedef struct renderer_backend {
 // Packet of data that is passed to the renderer to render a frame (like meshes, camera angles, environment, etc...)
 typedef struct render_packet {
     f32 delta_time;
+
+    u32 geometry_count;
+    geometry_render_data* geometries;
 } render_packet;
 

@@ -13,14 +13,16 @@ b8 vulkan_backend_begin_frame(struct renderer_backend* backend, f32 delta_time);
 void vulkan_backend_update_global_state(mat4 projection, mat4 view, vec3 view_position, vec4 ambient_colour, i32 mode);
 b8 vulkan_backend_end_frame(struct renderer_backend* backend, f32 delta_time);
 
-void vulkan_backend_update_object(geometry_render_data data);
+void vulkan_backend_draw_geometry(geometry_render_data data);
 
 void vulkan_backend_create_texture(
-    const char* name,
-    i32 width,
-    i32 height,
-    i32 channel_count,
     const u8* pixels,
-    b8 has_transparency,
-    struct texture* out_texture);
+    struct texture* texture);
 void vulkan_backend_destroy_texture(texture * texture);
+
+b8 vulkan_backend_create_material(struct material* material);
+void vulkan_backend_destroy_material(struct material* material);
+
+b8 vulkan_backend_create_geometry(geometry* geometry, u32 vertex_count, const vertex_3d* vertices, u32 index_count,
+                                  const u32* indices);
+void vulkan_backend_destroy_geometry(geometry* geometry);

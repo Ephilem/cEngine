@@ -13,6 +13,8 @@ add_executable(cEngine_tests
         src/memory/linear_allocator_tests.h
         src/containers/hashtable_tests.c
         src/containers/hashtable_tests.h
+        src/core/cstring_tests.c
+        src/core/cstring_tests.h
 )
 
 

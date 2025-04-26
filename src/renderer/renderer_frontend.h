@@ -17,11 +17,17 @@ void renderer_on_resize(u16 width, u16 height);
 b8 renderer_draw_frame(render_packet* packet);
 
 void renderer_create_texture(
-    const char* name,
-    i32 width,
-    i32 height,
-    i32 channel_count,
     const u8* pixels,
-    b8 has_transparency,
-    struct texture* out_texture);
+    struct texture* texture);
 void renderer_destroy_texture(struct texture* texture);
+
+b8 renderer_create_material(struct material* material);
+void renderer_destroy_material(struct material* material);
+
+b8 renderer_create_geometry(
+    geometry* geometry,
+    u32 vertex_count,
+    const vertex_3d* vertices,
+    u32 index_count,
+    const u32* indices);
+void renderer_destroy_geometry(geometry* geometry);

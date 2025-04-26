@@ -8,8 +8,12 @@
 #include "platform/platform.h"
 #include "core/input.h"
 #include "memory/linear_allocator.h"
+#include "cstring.h"
+#include "math/cmath.h"
 
 #include "renderer/renderer_frontend.h"
+#include "systems/geometry_system.h"
+#include "systems/material_system.h"
 #include "systems/texture_system.h"
 
 enum application_state_enum {
@@ -53,6 +57,15 @@ typedef struct application_state {
 
     u64 texture_system_memory_requirement;
     void* texture_system_state;
+
+    u64 material_system_memory_requirement;
+    void* material_system_state;
+
+    u64 geometry_system_memory_requirement;
+    void* geometry_system_state;
+
+    geometry* test_geometry;
+
 } application_state;
 
 static b8 initialized = false;
@@ -61,6 +74,31 @@ static application_state* app_state; // pointer to the application's instance ap
 b8 application_on_event(u16 code, void* sender, void* listener_inst, event_context context);
 b8 application_on_key(u16 code, void* sender, void* listener_inst, event_context context);
 b8 application_on_window_resize(u16 code, void* sender, void* listener_inst, event_context context);
+
+b8 event_on_debug_event(u16 code, void* sender, void* listener_inst, event_context data) {
+    const char* names[3] = {
+        "cobblestone",
+        "clay",
+        "bookshelf",
+    };
+    static i8 choice = 2;
+    const char* old_name = names[choice];
+
+    choice++;
+    choice %= 3;
+
+    if (app_state->test_geometry) {
+        app_state->test_geometry->material->diffuse_map.texture = texture_system_acquire(names[choice], true);
+        if (!app_state->test_geometry->material->diffuse_map.texture) {
+            LOG_WARN("failed to acquire texture '%s'. using default", names[choice]);
+            app_state->test_geometry->material->diffuse_map.texture = texture_system_get_default_texture();
+        }
+
+        texture_system_release(old_name);
+    }
+
+    return true;
+}
 
 b8 application_create(app* app_inst) {
     if (app_inst->application_state) {
@@ -74,7 +112,7 @@ b8 application_create(app* app_inst) {
     app_state->app_inst = app_inst;
     app_state->state = APPLICATION_STATE_STARTING;
 
-    u64 systems_allocator_total_size = 1024 * 1024 * 4; // Réduit à 2 MB au lieu de 10 MB
+    u64 systems_allocator_total_size = 1024 * 1024 * 64; // 10 MB
     linear_allocator_create(systems_allocator_total_size, 0, &app_state->systems_allocator);
     
     // Vérifions si l'allocateur a été correctement initialisé
@@ -169,10 +207,41 @@ b8 application_create(app* app_inst) {
         return false;
     }
 
+    // Material system
+    material_system_config material_sys_config;
+    material_sys_config.max_material_count = 65536;
+    material_system_initialize(&app_state->material_system_memory_requirement, 0, material_sys_config);
+    app_state->material_system_state = linear_allocator_allocate(&app_state->systems_allocator, app_state->material_system_memory_requirement);
+    if (!material_system_initialize(&app_state->material_system_memory_requirement, app_state->material_system_state, material_sys_config)) {
+        LOG_FATAL("Failed to initialize material system! Shutting down.");
+        return false;
+    }
+
+    // Geometry system
+    geometry_system_config geometry_sys_config;
+    geometry_sys_config.max_geometry_count = 4096;
+    geometry_system_initialize(&app_state->geometry_system_memory_requirement, 0, geometry_sys_config);
+    app_state->geometry_system_state = linear_allocator_allocate(&app_state->systems_allocator, app_state->geometry_system_memory_requirement);
+    if (!geometry_system_initialize(&app_state->geometry_system_memory_requirement, app_state->geometry_system_state, geometry_sys_config)) {
+        LOG_FATAL("Failed to initialize geometry system! Shutting down.");
+        return false;
+    }
+
+    // todo: temp
+
+    geometry_config g_config = geometry_system_generate_plane_config(10.0f, 10.0f, 5, 5, 2.0f, 2.0f, "test_plane", "test_material");
+    app_state->test_geometry = geometry_system_acquire_from_config(g_config, true);
+
+    cfree(g_config.vertices, sizeof(vertex_3d) * g_config.vertex_count, MEMORY_TAG_ARRAY);
+    cfree(g_config.indices, sizeof(u32) * g_config.index_count, MEMORY_TAG_ARRAY);
+
+    // todo: end temp
+
     event_register(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
     event_register(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
     event_register(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
     event_register(EVENT_CODE_WINDOW_RESIZE, 0, application_on_window_resize);
+    event_register(EVENT_CODE_DEBUG0, 0, event_on_debug_event);
 
     if (!app_state->app_inst->initialize(app_inst)) {
         LOG_FATAL("Application failed to initialize! Shutting down.");
@@ -219,6 +288,16 @@ b8 application_run() {
 
             render_packet packet;
             packet.delta_time = (f32)delta;
+
+            // TODO: temp
+            geometry_render_data test_render;
+            test_render.geometry = app_state->test_geometry;
+            test_render.model = mat4_identity();
+
+            packet.geometries = &test_render;
+            packet.geometry_count = 1;
+            // TODO: end temp
+
             renderer_draw_frame(&packet);
 
             f64 frame_end_time = platform_get_absolute_time();
@@ -246,12 +325,22 @@ b8 application_run() {
 
     app_state->state = APPLICATION_STATE_SHUTDOWN;
 
+    event_unregister(EVENT_CODE_DEBUG0, 0, event_on_debug_event);
+    event_unregister(EVENT_CODE_WINDOW_RESIZE, 0, application_on_window_resize);
     event_unregister(EVENT_CODE_APPLICATION_QUIT, 0, application_on_event);
     event_unregister(EVENT_CODE_KEY_PRESSED, 0, application_on_key);
     event_unregister(EVENT_CODE_KEY_RELEASED, 0, application_on_key);
 
     if (app_state->event_system_state) {
         event_shutdown();
+    }
+
+    if (app_state->geometry_system_state) {
+        geometry_system_shutdown(app_state->geometry_system_state);
+    }
+
+    if (app_state->material_system_state) {
+        material_system_shutdown(app_state->material_system_state);
     }
 
     if (app_state->texture_system_state) {

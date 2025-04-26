@@ -32,12 +32,14 @@ b8 filesystem_open(const char* path, file_modes mode, b8 binary, file_handle* ou
 void filesystem_close(file_handle* handle);
 
 /**
- * Read text in a file up to a new line or EOF. -allocate- *line_buffer, which must be freed!!!!!
- * @param handle file handle to read from
- * @param line_buffer buffer to store the read line
+ * Read up to a newline or EOF
+ * @param handle A pointer to a file hadle structure.
+ * @param max_length max length to be read from the line
+ * @param line_buf A pointer to a character away populated by this method. Must already be -allocated-!
+ * @param out_line_length A pointer to a u64 variable that will be set to the length of the line read
  * @return true if the line was read successfully, false otherwise
  */
-b8 filesystem_read_line(file_handle* handle, char** line_buffer);
+b8 filesystem_read_line(file_handle* handle, u64 max_length, char** line_buf, u64* out_line_length);
 
 /**
  * Writes text to the provided file, appending a new line at the end

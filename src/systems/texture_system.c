@@ -27,8 +27,9 @@ typedef struct texture_reference {
 
 static texture_system_state* state_ptr = 0;
 
-b8 create_default_texture(texture* texture);
+b8 create_default_texture(texture_system_state* state);
 void destroy_default_texture(texture_system_state* state);
+void destroy_texture(texture* t);
 
 b8 load_texture(const char* texture_name, texture* t);
 
@@ -70,7 +71,7 @@ b8 texture_system_initialize(u64 *memory_requirement, void *state, texture_syste
         state_ptr->registered_textures[i].generation = INVALID_ID;
     }
 
-    create_default_texture(&state_ptr->default_texture);
+    create_default_texture(state_ptr);
 
     LOG_INFO("Texture system initialized with %i textures", state_ptr->config.max_texture_count);
 
@@ -156,25 +157,28 @@ void texture_system_release(const char *name) {
             LOG_WARN("tried to release non-existant texture: '%s'", name);
             return;
         }
+
+        char name_copy[TEXTURE_NAME_MAX_LENGTH];
+        string_ncopy(name_copy, name, TEXTURE_NAME_MAX_LENGTH);
+
         ref.reference_count--;
         if (ref.reference_count == 0 && ref.auto_release) {
             texture* t = &state_ptr->registered_textures[ref.handle];
 
             renderer_destroy_texture(t);
 
-            czero_memory(t, sizeof(texture));
-            t->id = INVALID_ID;
-            t->generation = INVALID_ID;
+            // destroy/reset texture
+            destroy_texture(t);
 
             // Reset the reference
             ref.handle = INVALID_ID;
             ref.auto_release = false;
-            LOG_TRACE("Released texture '%s' and ref_count is now %i", name, ref.reference_count);
+            LOG_TRACE("Released texture '%s' and ref_count is now %i", name_copy, ref.reference_count);
         } else {
-            LOG_TRACE("Released texture '%s', now ref_count is %i", name, ref.reference_count);
+            LOG_TRACE("Released texture '%s', now ref_count is %i", name_copy, ref.reference_count);
         }
 
-        hashtable_set(&state_ptr->registered_texture_table, name, &ref);
+        hashtable_set(&state_ptr->registered_texture_table, name_copy, &ref);
     } else {
         LOG_ERROR("texture failed to release texture '%s'", name);
     }
@@ -210,6 +214,7 @@ b8 load_texture(const char* texture_name, texture* t) {
         required_channel_count);
     if (!data) {
         LOG_ERROR("Failed to load texture %s. %s", file_path, stbi_failure_reason());
+        stbi__err(0, 0);
         return false;
     }
     LOG_DEBUG("Loaded texture %s (%d x %d)", file_path, temp_texture.width, temp_texture.height);
@@ -231,15 +236,17 @@ b8 load_texture(const char* texture_name, texture* t) {
 
     if (stbi_failure_reason()) {
         LOG_WARN("Failed to load texture %s: %s", file_path, stbi_failure_reason());
+        stbi__err(0, 0);
+        return false;
     }
 
+    // copy the texture name
+    string_ncopy(temp_texture.name, texture_name, TEXTURE_NAME_MAX_LENGTH);
+    temp_texture.generation = INVALID_ID;
+    temp_texture.has_transparency = has_transparency;
+
     renderer_create_texture(
-        texture_name,
-        temp_texture.width,
-        temp_texture.height,
-        temp_texture.channel_count,
         data,
-        has_transparency,
         &temp_texture);
 
     texture old = *t;
@@ -257,7 +264,7 @@ b8 load_texture(const char* texture_name, texture* t) {
     return true;
 }
 
-b8 create_default_texture(texture *texture) {
+b8 create_default_texture(texture_system_state* state) {
     // Generate a default texture
     LOG_TRACE("Generating default texture...");
     const u32 tex_dimension = 256;
@@ -285,14 +292,29 @@ b8 create_default_texture(texture *texture) {
         }
     }
 
-    renderer_create_texture(DEFAULT_TEXTURE_NAME, tex_dimension, tex_dimension, channels, pixels, false, texture);
-    texture->generation = INVALID_ID;
+    string_ncopy(state->default_texture.name, DEFAULT_TEXTURE_NAME, TEXTURE_NAME_MAX_LENGTH);
+    state->default_texture.width = tex_dimension;
+    state->default_texture.height = tex_dimension;
+    state->default_texture.channel_count = channels;
+    state->default_texture.generation = INVALID_ID;
+    state->default_texture.has_transparency = false;
+    renderer_create_texture(pixels, &state->default_texture);
 
     return true;
 }
 
 void destroy_default_texture(texture_system_state* state) {
     if (state) {
-        renderer_destroy_texture(&state->default_texture);
+        destroy_texture(&state->default_texture);
+    }
+}
+
+void destroy_texture(texture* t) {
+    if (t) {
+        renderer_destroy_texture(t);
+
+        czero_memory(t, sizeof(texture));
+        t->id = INVALID_ID;
+        t->generation = INVALID_ID;
     }
 }

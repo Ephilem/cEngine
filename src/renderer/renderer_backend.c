@@ -15,10 +15,16 @@ b8 renderer_backend_create(renderer_backend_type type, struct platform_state* pl
             out_backend->update_global_state = vulkan_backend_update_global_state;
             out_backend->end_frame = vulkan_backend_end_frame;
             out_backend->resized = vulkan_backend_resized;
-            out_backend->update_object = vulkan_backend_update_object;
+            out_backend->draw_geometry = vulkan_backend_draw_geometry;
 
             out_backend->create_texture = vulkan_backend_create_texture;
             out_backend->destroy_texture = vulkan_backend_destroy_texture;
+
+            out_backend->create_material = vulkan_backend_create_material;
+            out_backend->destroy_material = vulkan_backend_destroy_material;
+
+            out_backend->create_geometry = vulkan_backend_create_geometry;
+            out_backend->destroy_geometry = vulkan_backend_destroy_geometry;
         } break;
         /*case RENDERER_BACKEND_OPENGL: {
             return renderer_backend_opengl_create(platform_state, out_backend);
@@ -41,4 +47,11 @@ void renderer_backend_destroy(renderer_backend* backend) {
     backend->update_global_state = 0;
     backend->end_frame = 0;
     backend->resized = 0;
+    backend->draw_geometry = 0;
+    backend->create_texture = 0;
+    backend->destroy_texture = 0;
+    backend->create_material = 0;
+    backend->destroy_material = 0;
+    backend->create_geometry = 0;
+    backend->destroy_geometry = 0;
 }

@@ -89,7 +89,11 @@ add_library(cEngine
         src/containers/hashtable.c
         src/containers/hashtable.h
         src/systems/texture_system.c
-        src/systems/texture_system.h)
+        src/systems/texture_system.h
+        src/systems/material_system.c
+        src/systems/material_system.h
+        src/systems/geometry_system.c
+        src/systems/geometry_system.h)
 
 target_include_directories(
         cEngine
@@ -140,14 +144,14 @@ else()
     add_dependencies(cEngine Shaders)
 endif()
 
-add_custom_target(CopyTextures ALL
+add_custom_target(CopyAssets ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${ASSETS_SOURCE_DIR}/textures
-    ${ASSETS_OUTPUT_DIR}/textures
+    ${ASSETS_SOURCE_DIR}
+    ${ASSETS_OUTPUT_DIR}
     COMMENT "Copying textures to build assets directory"
 )
 
-add_dependencies(cEngine CopyTextures)
+add_dependencies(cEngine CopyAssets)
 
 add_subdirectory(example)
 add_subdirectory(tests)
