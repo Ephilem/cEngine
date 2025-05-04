@@ -93,7 +93,17 @@ add_library(cEngine
         src/systems/material_system.c
         src/systems/material_system.h
         src/systems/geometry_system.c
-        src/systems/geometry_system.h)
+        src/systems/geometry_system.h
+        src/systems/resource_system.c
+        src/systems/resource_system.h
+        src/resources/loaders/image_loader.c
+        src/resources/loaders/image_loader.h
+        src/resources/loaders/material_loader.c
+        src/resources/loaders/material_loader.h
+        src/resources/loaders/binary_loader.c
+        src/resources/loaders/binary_loader.h
+        src/resources/loaders/text_loader.c
+        src/resources/loaders/text_loader.h)
 
 target_include_directories(
         cEngine

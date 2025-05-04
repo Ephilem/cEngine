@@ -32,6 +32,14 @@ b8 filesystem_open(const char* path, file_modes mode, b8 binary, file_handle* ou
 void filesystem_close(file_handle* handle);
 
 /**
+ * try to read the file size
+ * @param handle A pointer to a file hadle structure.
+ * @param out_size A pointer to a u64 variable that will be set to the size of the file
+ * @return true if the size was read successfully, false otherwise
+ */
+b8 filesystem_size(file_handle* handle, u64* out_size);
+
+/**
  * Read up to a newline or EOF
  * @param handle A pointer to a file hadle structure.
  * @param max_length max length to be read from the line
@@ -60,14 +68,22 @@ b8 filesystem_write_line(file_handle* handle, const char* text);
 b8 filesystem_read(file_handle* handle, u64 data_size, void* out_data, u64* out_bytes_read);
 
 /**
- * Read all bytes from the file into out_bytes. The out_bytes_read will be set to the number of bytes read.
- * -Allocate- *out_bytes, which must be freed!
+ * Reads all bytes to data into out_bytes
  * @param handle file handle to read from
- * @param out_bytes a pointer to a byte array which will be allocatedf and filled with the file data
+ * @param out_bytes a pointer which will be populated with the data read from the file
  * @param out_bytes_read pointer to store the number of bytes read
  * @return true if the bytes were read successfully, false otherwise
  */
-b8 filesystem_read_all_bytes(file_handle* handle, u8** out_bytes, u64* out_bytes_read);
+b8 filesystem_read_all_bytes(file_handle* handle, u8* out_bytes, u64* out_bytes_read);
+
+/**
+ * Reads all text to data into out_text
+ * @param handle file handle to read from
+ * @param out_text a pointer which will be populated with the data read from the file
+ * @param out_bytes_read pointer to store the number of bytes read
+ * @return true if the bytes were read successfully, false otherwise
+ */
+b8 filesystem_read_all_text(file_handle* handle, char** out_text, u64* out_bytes_read);
 
 b8 filesystem_write(file_handle* handle, u64 data_size, const void* data, u64* out_bytes_written);
 

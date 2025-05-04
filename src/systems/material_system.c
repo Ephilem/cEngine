@@ -7,9 +7,9 @@
 #include "renderer/renderer_frontend.h"
 
 // TEMP
+#include "resource_system.h"
 #include "texture_system.h"
 #include "math/cmath.h"
-#include "platform/filesystem.h"
 
 typedef struct material_system_state {
     material_system_config config;
@@ -32,7 +32,6 @@ static material_system_state* state_ptr = 0;
 b8 create_default_material(material_system_state* state);
 b8 load_material(material_config config, material* m);
 void destroy_material(material* m);
-b8 load_configuration_file(const char* file_path, material_config* config);
 
 b8 material_system_initialize(u64* memory_requirement, void* state, material_system_config config) {
     if (config.max_material_count == 0) {
@@ -101,20 +100,26 @@ void material_system_shutdown(void* state) {
 }
 
 material* material_system_acquire(const char* name) {
-    material_config config;
-
-    // load file from disk
-    // TODO : should be able to be localed anywhere
-    char* format_str = "./assets/materials/%s.%s";
-    char file_path[1024];
-
-    string_format(file_path, format_str, name, "cmat");
-    if (!load_configuration_file(file_path, &config)) {
-        LOG_ERROR("Failed to load material configuration file %s", file_path);
+    // load the resource
+    resource material_resource;
+    if (!resource_system_load(name, RESOURCE_TYPE_MATERIAL, &material_resource)) {
+        LOG_ERROR("Failed to load material '%s'", name);
         return 0;
     }
 
-    return material_system_acquire_from_config(config);
+    material* m;
+    if (material_resource.data) {
+        m = material_system_acquire_from_config(*(material_config*)material_resource.data);
+    }
+
+    // cleanup
+    resource_system_unload(&material_resource);
+
+    if (!m) {
+        LOG_ERROR("Failed to acquire material '%s'", name);
+    }
+
+    return m;
 }
 
 material* material_system_acquire_from_config(material_config config) {
@@ -273,77 +278,6 @@ void destroy_material(material* m) {
     m->id = INVALID_ID;
     m->generation = INVALID_ID;
     m->internal_id = INVALID_ID;
-}
-
-b8 load_configuration_file(const char* file_path, material_config* config) {
-    czero_memory(config, sizeof(material_config));
-
-    // load the file
-    file_handle file;
-    if (!filesystem_open(file_path, FILE_MODE_READ, false, &file)) {
-        LOG_ERROR("Failed to open material configuration file '%s'", file_path);
-        return false;
-    }
-
-    // Read file
-    char line_buffer[1024] = "";
-    char* p = &line_buffer[0];
-    u64 line_length = 0;
-    u32 line_number = 1;
-    while (filesystem_read_line(&file, 1023, &p, &line_length)) {
-        char* trimmed = string_trim(line_buffer);
-        line_length = string_length(trimmed);
-
-        // skip empty lines and comments
-        if (line_length == 0 || trimmed[0] == '#') {
-            line_number++;
-            continue;
-        }
-
-        // parse the line
-        i32 equal_index = string_index_of(trimmed, '=');
-        if (equal_index == -1) {
-            LOG_WARN("Invalid line in material configuration file '%s' at line %i: '%s'", file_path, line_number, trimmed);
-            line_number++;
-            continue;
-        }
-
-        // assume the key max length is 64
-        char raw_var_name[64] = "";
-        czero_memory(raw_var_name, sizeof(char) * 64);
-        string_mid(raw_var_name, trimmed, 0, equal_index);
-        char* trimmed_var_name = string_trim(raw_var_name);
-
-        // assume a max of 511 - 65 = 446 for the value
-        char raw_value[446];
-        czero_memory(raw_value, sizeof(char) * 446);
-        string_mid(raw_value, trimmed, equal_index + 1, -1);
-        char* trimmed_var_value = string_trim(raw_value);
-
-        // process the variable
-        if (string_equals_case(trimmed_var_name, "version")) {
-            // TODO: versioning
-        } else if (string_equals_case(trimmed_var_name, "name")) {
-            string_ncopy(config->name, trimmed_var_value, MATERIAL_NAME_MAX_LENGTH);
-        } else if (string_equals_case(trimmed_var_name, "diffuse_map_name")) {
-            string_ncopy(config->diffuse_map_name, trimmed_var_value, TEXTURE_NAME_MAX_LENGTH);
-        } else if (string_equals_case(trimmed_var_name, "diffuse_color")) {
-            if (!string_to_vec4(trimmed_var_value, &config->diffuse_color)) {
-                LOG_WARN("Invalid diffuse color in material configuration file '%s' at line %i: '%s'", file_path, line_number, trimmed_var_value);
-                config->diffuse_color = vec4_one();
-            }
-        }
-
-        // TODO more fields
-
-        czero_memory(line_buffer, sizeof(char) * line_length);
-        line_number++;
-    }
-
-    // close file
-    filesystem_close(&file);
-
-    return true;
 }
 
 material* material_system_get_default_material() {

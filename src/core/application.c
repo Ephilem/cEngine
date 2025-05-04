@@ -14,6 +14,7 @@
 #include "renderer/renderer_frontend.h"
 #include "systems/geometry_system.h"
 #include "systems/material_system.h"
+#include "systems/resource_system.h"
 #include "systems/texture_system.h"
 
 enum application_state_enum {
@@ -63,6 +64,9 @@ typedef struct application_state {
 
     u64 geometry_system_memory_requirement;
     void* geometry_system_state;
+
+    u64 resource_system_memory_requirement;
+    void* resource_system_state;
 
     geometry* test_geometry;
 
@@ -166,6 +170,20 @@ b8 application_create(app* app_inst) {
         &app_state->systems_allocator, app_state->platform_system_memory_requirement);
     if (!initialize_platform(&app_state->platform_system_memory_requirement, app_state->platform_system_state)) {
         LOG_FATAL("Failed to initialize platform system! Shutting down.");
+        return false;
+    }
+
+    // Resource system
+    resource_system_config resource_sys_config;
+    resource_sys_config.max_loader_count = 16;
+    resource_sys_config.asset_base_path = "assets/";
+    resource_system_initialize(
+        &app_state->resource_system_memory_requirement, 0, resource_sys_config);
+    app_state->resource_system_state = linear_allocator_allocate(
+        &app_state->systems_allocator, app_state->resource_system_memory_requirement);
+    if (!resource_system_initialize(
+            &app_state->resource_system_memory_requirement, app_state->resource_system_state, resource_sys_config)) {
+        LOG_FATAL("Failed to initialize resource system! Shutting down.");
         return false;
     }
 
@@ -356,6 +374,8 @@ b8 application_run() {
     if (app_state->renderer_system_state) {
         shutdown_renderer();
     }
+
+    resource_system_shutdown(app_state->resource_system_state);
     
     if (app_state->platform_system_state) {
         shutdown_platform();

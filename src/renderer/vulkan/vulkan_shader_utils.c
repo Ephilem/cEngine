@@ -2,50 +2,27 @@
 
 #include "core/cstring.h"
 #include "core/logger.h"
-#include "platform/filesystem.h"
 #include "core/cmemory.h"
-
-#define SHADERS_PATH "shaders"
-
-
+#include "systems/resource_system.h"
 
 
 b8 create_shader_module(vulkan_context *context, const char *shader_name, const char *stage_type_str,
-    VkShaderStageFlagBits shader_stage_flag, u32 stage_index, vulkan_shader_stage *shader_stages) {
-
-    // Build file name :
-    // TODO: use a resource system instead of the hack of ../ to get the cEngine buildin compiled shaders folder
+                        VkShaderStageFlagBits shader_stage_flag, u32 stage_index, vulkan_shader_stage *shader_stages) {
     char file_name[1024];
-    string_format(file_name, "./assets/shaders/%s.%s.spv", shader_name, stage_type_str);
-
-    LOG_DEBUG("Loading shader from: %s", file_name);
-    LOG_DEBUG("Shader file exists: %s", filesystem_exists(file_name) ? "YES" : "NO");
-
+    string_format(file_name, "shaders/%s.%s.spv", shader_name, stage_type_str);
 
     czero_memory(&shader_stages[stage_index].create_info, sizeof(VkShaderModuleCreateInfo));
     shader_stages[stage_index].create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
 
-
-    // obtain file handler
-    file_handle handle;
-    if (!filesystem_open(file_name, FILE_MODE_READ, true, &handle)) {
-        LOG_ERROR("Failed to open shader file %s", file_name);
+    // read the resource
+    resource binary_resource;
+    if (!resource_system_load(file_name, RESOURCE_TYPE_BINARY, &binary_resource)) {
+        LOG_ERROR("Failed to load shader file %s", file_name);
         return false;
     }
 
-    // read the file
-    u64 file_size = 0;
-    u8* file_buffer = 0;
-    if (!filesystem_read_all_bytes(&handle, &file_buffer, &file_size)) {
-        LOG_ERROR("Failed to read shader file %s", file_name);
-        filesystem_close(&handle);
-        return false;
-    }
-    shader_stages[stage_index].create_info.codeSize = file_size;
-    shader_stages[stage_index].create_info.pCode = (u32*)file_buffer;
-    LOG_DEBUG("File size is %llu bytes", file_size);
-
-    filesystem_close(&handle);
+    shader_stages[stage_index].create_info.codeSize = binary_resource.data_size;
+    shader_stages[stage_index].create_info.pCode = (u32*)binary_resource.data;
 
     VK_CHECK(vkCreateShaderModule(
         context->device.logical,
@@ -53,16 +30,14 @@ b8 create_shader_module(vulkan_context *context, const char *shader_name, const 
         context->allocator,
         &shader_stages[stage_index].handle));
 
+    // release the resource
+    resource_system_unload(&binary_resource);
+
     czero_memory(&shader_stages[stage_index].shader_stage_create_info, sizeof(VkShaderModuleCreateInfo));
     shader_stages[stage_index].shader_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shader_stages[stage_index].shader_stage_create_info.stage = shader_stage_flag;
     shader_stages[stage_index].shader_stage_create_info.module = shader_stages[stage_index].handle;
     shader_stages[stage_index].shader_stage_create_info.pName = "main"; // entry point name
-
-    if (file_buffer) {
-        cfree(file_buffer, sizeof(u8) * file_size, MEMORY_TAG_STRING);
-        file_buffer = 0;
-    }
 
     return true;
 }
